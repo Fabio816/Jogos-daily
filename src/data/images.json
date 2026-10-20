@@ -1,0 +1,219 @@
+{
+  "m01": {
+    "tmdbId": 238,
+    "tmdbTitle": "O Poderoso Chefão",
+    "year": "1972",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/wOMxE93W6KcZTuCeNUByNTSaLLt.jpg",
+    "matchedQuery": "O Poderoso Chefão"
+  },
+  "m02": {
+    "tmdbId": 568,
+    "tmdbTitle": "Apollo 13 - Do Desastre ao Triunfo",
+    "year": "1995",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/22dmzRXNULYaIllVAiIpa2bjmEY.jpg",
+    "matchedQuery": "Apollo 13"
+  },
+  "m03": {
+    "tmdbId": 11,
+    "tmdbTitle": "Guerra nas Estrelas",
+    "year": "1977",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/dw7X9YPjjAfIxKHW04V64Bb9TB0.jpg",
+    "matchedQuery": "Star Wars"
+  },
+  "m04": {
+    "tmdbId": 597,
+    "tmdbTitle": "Titanic",
+    "year": "1997",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/As0zX43h3w6kD2NS4uVHu9HKdEh.jpg",
+    "matchedQuery": "Titanic"
+  },
+  "m05": {
+    "tmdbId": 78,
+    "tmdbTitle": "Blade Runner: O Caçador de Andróides",
+    "year": "1982",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/y5ibL0vFnzsRiIHosw0WOfHtIj1.jpg",
+    "matchedQuery": "Blade Runner"
+  },
+  "m06": {
+    "tmdbId": 557,
+    "tmdbTitle": "Homem-Aranha",
+    "year": "2002",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/RbZQL5hXmydecu82UHw9ZGyytB.jpg",
+    "matchedQuery": "Homem-Aranha"
+  },
+  "m07": {
+    "tmdbId": 862,
+    "tmdbTitle": "Toy Story: Um Mundo de Aventuras",
+    "year": "1995",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/686F0CEPmI4ZXjFbWtIHQOBwnfI.jpg",
+    "matchedQuery": "Toy Story"
+  },
+  "m08": {
+    "tmdbId": 329,
+    "tmdbTitle": "Jurassic Park: O Parque dos Dinossauros",
+    "year": "1993",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/mgjJ7FH4V3exsmoHwXrmsUhn0h1.jpg",
+    "matchedQuery": "Jurassic Park"
+  },
+  "m09": {
+    "tmdbId": 597,
+    "tmdbTitle": "Titanic",
+    "year": "1997",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/As0zX43h3w6kD2NS4uVHu9HKdEh.jpg",
+    "matchedQuery": "Titanic"
+  },
+  "m10": {
+    "tmdbId": 578,
+    "tmdbTitle": "Tubarão",
+    "year": "1975",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/iD2XVowFgHngYGamCAdq2T44gMr.jpg",
+    "matchedQuery": "Tubarão"
+  },
+  "m11": {
+    "tmdbId": 109445,
+    "tmdbTitle": "Frozen: Uma Aventura Congelante",
+    "year": "2013",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/hOZKUJGN0m717LRSQDxhgABqWrf.jpg",
+    "matchedQuery": "Frozen"
+  },
+  "m12": {
+    "tmdbId": 157336,
+    "tmdbTitle": "Interestelar",
+    "year": "2014",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/tR1XVa5bxgdh2bRw2u0DzrgkO2l.jpg",
+    "matchedQuery": "Interestelar"
+  },
+  "m13": {
+    "tmdbId": 24428,
+    "tmdbTitle": "Os Vingadores: The Avengers",
+    "year": "2012",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/PtSapjHdDjlVcsqdEo0u7rDE6i.jpg",
+    "matchedQuery": "Os Vingadores"
+  },
+  "m14": {
+    "tmdbId": 671,
+    "tmdbTitle": "Harry Potter e a Pedra Filosofal",
+    "year": "2001",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/4rtsbE9aQ1qw4gv7yYwaNYfWFoS.jpg",
+    "matchedQuery": "Harry Potter e a Pedra Filosofal"
+  },
+  "m15": {
+    "tmdbId": 808,
+    "tmdbTitle": "Shrek",
+    "year": "2001",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/wxeqfC221YMptRRdzxlijAh7q8l.jpg",
+    "matchedQuery": "Shrek"
+  },
+  "s01": {
+    "tmdbId": 1399,
+    "tmdbTitle": "Game of Thrones",
+    "year": "2011",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/aqomTRKjNZkmNEeOZnEmWrFTmKU.jpg",
+    "matchedQuery": "Game of Thrones"
+  },
+  "s02": {
+    "tmdbId": 66732,
+    "tmdbTitle": "Stranger Things",
+    "year": "2016",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/twfKp60THrcOIep9sjHODOOfO8d.jpg",
+    "matchedQuery": "Stranger Things"
+  },
+  "s03": {
+    "tmdbId": 71446,
+    "tmdbTitle": "La casa de papel",
+    "year": "2017",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/k8ytNZ32uf4JtrtpfIw54MD0oZX.jpg",
+    "matchedQuery": "La Casa de Papel"
+  },
+  "s04": {
+    "tmdbId": 1668,
+    "tmdbTitle": "Friends",
+    "year": "1994",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/2koX1xLkpTQM4IZebYvKysFW1Nh.jpg",
+    "matchedQuery": "Friends"
+  },
+  "s05": {
+    "tmdbId": 1396,
+    "tmdbTitle": "Breaking Bad",
+    "year": "2008",
+    "posterUrl": "https://image.tmdb.org/t/p/w500/hGwm9Cj3CdbJIqQWNExQqiYmCd4.jpg",
+    "matchedQuery": "Breaking Bad"
+  },
+  "g01": {
+    "igdbId": 135400,
+    "tmdbTitle": "Minecraft",
+    "year": 2016,
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/co8fu7.jpg",
+    "matchedQuery": "Minecraft"
+  },
+  "g02": {
+    "igdbId": 63639,
+    "tmdbTitle": "Pac-Man",
+    "year": 2013,
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/coc9oo.jpg",
+    "matchedQuery": "Pac-Man"
+  },
+  "g03": {
+    "igdbId": 270420,
+    "tmdbTitle": "Tetris",
+    "year": 2008,
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/co9sq6.jpg",
+    "matchedQuery": "Tetris"
+  },
+  "g04": {
+    "igdbId": 26764,
+    "tmdbTitle": "Mario Kart 8 Deluxe",
+    "year": 2017,
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/co213p.jpg",
+    "matchedQuery": "Mario Kart 8 Deluxe"
+  },
+  "g05": {
+    "igdbId": 316900,
+    "tmdbTitle": "Sonic The Hedgehog",
+    "year": null,
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/co8ubt.jpg",
+    "matchedQuery": "Sonic the Hedgehog"
+  },
+  "g06": {
+    "igdbId": 111469,
+    "tmdbTitle": "Among Us",
+    "year": 2018,
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/co6kqt.jpg",
+    "matchedQuery": "Among Us"
+  },
+  "g07": {
+    "igdbId": 1905,
+    "tmdbTitle": "Fortnite",
+    "year": 2020,
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/cocxbi.jpg",
+    "matchedQuery": "Fortnite"
+  },
+  "a01": {
+    "anilistId": 20,
+    "tmdbTitle": "Naruto",
+    "year": 2002,
+    "posterUrl": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx20-dE6UHbFFg1A5.jpg",
+    "matchedQuery": "Naruto"
+  },
+  "a02": {
+    "anilistId": 223,
+    "tmdbTitle": "Dragon Ball",
+    "year": 1986,
+    "posterUrl": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx223-scE5uJfXqqj8.png",
+    "matchedQuery": "Dragon Ball"
+  },
+  "a03": {
+    "anilistId": 16498,
+    "tmdbTitle": "Attack on Titan",
+    "year": 2013,
+    "posterUrl": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx16498-buvcRTBx4NSm.jpg",
+    "matchedQuery": "Attack on Titan"
+  },
+  "a04": {
+    "anilistId": 1535,
+    "tmdbTitle": "Death Note",
+    "year": 2006,
+    "posterUrl": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx1535-kUgkcrfOrkUM.jpg",
+    "matchedQuery": "Death Note"
+  }
+}

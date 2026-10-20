@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Minigames da turma: adivinhe a obra, o Termo, Bomb Party e Onde Estou?" />
+    <meta name="theme-color" content="#f4f1e8" />
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem('qeo:theme');
+          const dark = stored === 'dark' || (stored !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#1d1c1a' : '#f4f1e8');
+        } catch {}
+      })();
+    </script>
+    <title>Claude Games</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

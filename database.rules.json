@@ -1,0 +1,61 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "createdAt"
+      ],
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "termo": {
+      "rooms": {
+        ".read": "auth != null",
+        ".indexOn": [
+          "createdAt"
+        ],
+        "$code": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    },
+    "bomb": {
+      "rooms": {
+        ".read": "auth != null",
+        ".indexOn": [
+          "createdAt"
+        ],
+        "$code": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    },
+    "onde": {
+      "rooms": {
+        ".read": "auth != null",
+        ".indexOn": [
+          "createdAt"
+        ],
+        "$code": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    },
+    "ranking": {
+      ".read": "auth != null",
+      ".indexOn": [
+        "points"
+      ],
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    }
+  }
+}
