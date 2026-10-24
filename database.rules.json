@@ -48,6 +48,16 @@
         }
       }
     },
+    "alerts": {
+      "$game": {
+        "$code": {
+          ".read": "auth != null",
+          "$alertId": {
+            ".write": "auth != null && newData.child('uid').val() === auth.uid"
+          }
+        }
+      }
+    },
     "ranking": {
       ".read": "auth != null",
       ".indexOn": [

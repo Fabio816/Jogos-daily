@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluate, isValidGuess, normalizeWord, pickTarget, pointsFor } from './logic';
+import { eraseAt, evaluate, isValidGuess, normalizeWord, pickTarget, pointsFor } from './logic';
 
 describe('normalizeWord', () => {
   it('remove acento e caixa, mantém só letras', () => {
@@ -65,5 +65,23 @@ describe('pointsFor', () => {
     expect(pointsFor(1, 3)).toBe(30);
     expect(pointsFor(3, 3)).toBe(10);
     expect(pointsFor(4, 3)).toBe(0);
+  });
+});
+
+describe('eraseAt', () => {
+  it('apaga a letra da célula selecionada no meio e mantém o cursor', () => {
+    expect(eraseAt(['c', 'a', 's', 'a', ''], 1)).toEqual({ letters: ['c', '', 's', 'a', ''], cursor: 1 });
+  });
+
+  it('apaga a célula anterior quando a selecionada está vazia', () => {
+    expect(eraseAt(['c', 'a', '', '', ''], 2)).toEqual({ letters: ['c', '', '', '', ''], cursor: 1 });
+  });
+
+  it('não faz nada na primeira célula vazia', () => {
+    expect(eraseAt(['', '', '', '', ''], 0)).toEqual({ letters: ['', '', '', '', ''], cursor: 0 });
+  });
+
+  it('funciona com o cursor após a última célula', () => {
+    expect(eraseAt(['c', 'a', 's', 'a', 'r'], 5)).toEqual({ letters: ['c', 'a', 's', 'a', ''], cursor: 4 });
   });
 });

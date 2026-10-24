@@ -1,8 +1,11 @@
-import { QUESTIONS, type Difficulty, type Question, type WorkType } from '../data/questions';
+import { QUESTIONS, type Question, type WorkType } from '../data/questions';
 import { ACTOR_QUESTIONS } from '../data/actorQuestions';
+import { EMOJI_QUESTIONS } from '../data/emojiQuestions';
+import { PHRASE_QUESTIONS } from '../data/phraseQuestions';
 import { WORKS } from '../data/works';
 import images from '../data/images.json';
 import { filterQuestions } from './pool';
+import { DEFAULT_DIFFICULTY_MIX, DIFFICULTIES, type DifficultyMix } from './difficulty';
 import { DEFAULT_MIX, type Mix } from './mix';
 
 /** Configurações de uma partida (definidas pelo host e compartilhadas com todos). */
@@ -10,7 +13,8 @@ export interface RoomSettings {
   targetPoints: number;
   durationSec: number;
   types: WorkType[];
-  difficulties: Difficulty[];
+  /** Peso (%) de cada dificuldade. Não precisa somar 100: os pesos são proporcionais. */
+  difficultyMix: DifficultyMix;
   /** Peso (%) de cada tipo de rodada. Não precisa somar 100: os pesos são proporcionais. */
   mix: Mix;
 }
@@ -19,7 +23,7 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   targetPoints: 100,
   durationSec: 20,
   types: ['movie', 'series', 'game', 'anime'],
-  difficulties: ['mainstream', 'hard'],
+  difficultyMix: DEFAULT_DIFFICULTY_MIX,
   mix: DEFAULT_MIX,
 };
 
@@ -51,16 +55,22 @@ const WORK_QUESTIONS: Question[] = WORKS.map((w) => ({
   clueType: 'image',
   clue: '',
   imageUrl: w.posterUrl,
+  clearImageUrl: w.clearImageUrl,
   answers: [w.title, ...w.aliases],
   year: w.year,
 }));
 
-export const ALL_QUESTIONS: Question[] = [...QUESTIONS, ...WORK_QUESTIONS, ...ACTOR_WITH_POSTER];
+export const ALL_QUESTIONS: Question[] = [
+  ...QUESTIONS,
+  ...EMOJI_QUESTIONS,
+  ...PHRASE_QUESTIONS,
+  ...WORK_QUESTIONS,
+  ...ACTOR_WITH_POSTER,
+];
 
 /** Perguntas elegíveis conforme tipo e dificuldade. O sorteio por tipo de rodada é feito em mix.ts. */
 export function buildPool(settings: RoomSettings): Question[] {
-  return filterQuestions(ALL_QUESTIONS, {
-    types: settings.types,
-    difficulties: settings.difficulties,
-  });
+  const weights = settings.difficultyMix ?? DEFAULT_DIFFICULTY_MIX;
+  const difficulties = DIFFICULTIES.filter((d) => (weights[d] ?? 0) > 0);
+  return filterQuestions(ALL_QUESTIONS, { types: settings.types, difficulties });
 }

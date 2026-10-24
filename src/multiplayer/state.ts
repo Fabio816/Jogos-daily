@@ -1,6 +1,7 @@
 import type { Question } from '../data/questions';
 import { pointsFor } from '../game/scoring';
-import { DEFAULT_MIX, pickRound } from '../game/mix';
+import { DEFAULT_DIFFICULTY_MIX, type DifficultyMix } from '../game/difficulty';
+import { DEFAULT_MIX, pickRound, type Mix } from '../game/mix';
 import type { RoomSettings } from '../game/catalog';
 
 /** Tempo que a resposta fica visível antes da próxima rodada. */
@@ -40,6 +41,44 @@ function toArray<T>(value: unknown): T[] {
   return [];
 }
 
+function num(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function normalizeMix(raw: any): Mix {
+  const oldText = typeof raw?.texto === 'number' ? raw.texto : undefined;
+  const emoji = oldText === undefined ? DEFAULT_MIX.emoji : Math.round(oldText / 2);
+  const frase = oldText === undefined ? DEFAULT_MIX.frase : oldText - Math.round(oldText / 2);
+  return {
+    capa: num(raw?.capa, DEFAULT_MIX.capa),
+    'capa-clara': num(raw?.['capa-clara'], DEFAULT_MIX['capa-clara']),
+    emoji: num(raw?.emoji, emoji),
+    frase: num(raw?.frase, frase),
+    ator: num(raw?.ator, DEFAULT_MIX.ator),
+    personagem: num(raw?.personagem, DEFAULT_MIX.personagem),
+  };
+}
+
+function normalizeDifficultyMix(raw: any): DifficultyMix {
+  const mix = raw?.difficultyMix;
+  if (mix && typeof mix === 'object') {
+    return {
+      easy: num(mix.easy, 0),
+      medium: num(mix.medium, 0),
+      hard: num(mix.hard, 0),
+    };
+  }
+  const old = toArray<string>(raw?.difficulties);
+  if (old.length > 0) {
+    return {
+      easy: old.includes('mainstream') ? 30 : 0,
+      medium: old.includes('mainstream') ? 30 : 0,
+      hard: old.includes('hard') ? 40 : 0,
+    };
+  }
+  return { ...DEFAULT_DIFFICULTY_MIX };
+}
+
 /**
  * O Realtime Database omite listas e mapas vazios e pode devolver arrays como objetos.
  * Esta função devolve sempre a forma completa.
@@ -53,8 +92,8 @@ export function normalizeRoom(raw: any): RoomState {
       targetPoints: s.targetPoints ?? 100,
       durationSec: s.durationSec ?? 20,
       types: toArray(s.types),
-      difficulties: toArray(s.difficulties),
-      mix: { ...DEFAULT_MIX, ...(s.mix ?? {}) },
+      difficultyMix: normalizeDifficultyMix(s),
+      mix: normalizeMix(s.mix),
     },
     players: raw.players ?? {},
     round: raw.round ?? null,
@@ -66,7 +105,7 @@ const reachedTarget = (room: RoomState) =>
   Object.values(room.players).some((p) => p.score >= room.settings.targetPoints);
 
 function startNextRound(room: RoomState, now: number, pool: Question[], rng: () => number): RoomState {
-  const pick = pickRound(pool, new Set(Object.keys(room.used)), room.settings.mix, rng);
+  const pick = pickRound(pool, new Set(Object.keys(room.used)), room.settings.mix, room.settings.difficultyMix, rng);
   if (!pick) return { ...room, status: 'finished' };
 
   const q = pick.question;

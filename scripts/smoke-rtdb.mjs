@@ -24,7 +24,7 @@ try {
   await set(roomRef, {
     hostUid: host.user.uid,
     status: 'playing',
-    settings: { targetPoints: 100, durationSec: 20, types: ['movie'], difficulties: ['mainstream'], kinds: ['work'], imageMode: false },
+    settings: { targetPoints: 100, durationSec: 20, types: ['movie'], difficultyMix: { easy: 30, medium: 40, hard: 30 }, mix: { capa: 40, 'capa-clara': 20, emoji: 8, frase: 7, ator: 15, personagem: 10 } },
     players: { a: { name: 'A', score: 0, connected: true }, b: { name: 'B', score: 0, connected: true } },
     round: { n: 1, qid: 'x', startedAt: Date.now(), durationMs: 20000, status: 'clue' },
   });

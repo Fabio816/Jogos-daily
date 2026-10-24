@@ -6,8 +6,13 @@ import SettingsDialog from '../components/SettingsDialog.vue';
 import StreetPhoto from '../components/StreetPhoto.vue';
 import { ensureSignedIn } from '../firebase';
 import { addRankingPoints } from '../lib/ranking';
+import { clearInviteFromUrl, inviteCodeFromUrl } from '../lib/invite';
+import RoomInvite from '../components/RoomInvite.vue';
+import RoomPlayers from '../components/RoomPlayers.vue';
+import RoomAlerts from '../components/RoomAlerts.vue';
+import { useDevtoolsAlerts } from '../lib/alerts';
 import { serverNow } from '../lib/time';
-import type { Cell } from '../games/onde/geo';
+import { REGION_CHOICES, REGION_LABELS, SPREADS, SPREAD_LABELS, type Cell, type RegionChoice, type Spread } from '../games/onde/geo';
 import { findPhoto, PhotoError } from '../games/onde/photo';
 import {
   REVEAL_SHOW_MS,
@@ -32,11 +37,16 @@ import {
 const ROUND_OPTIONS = [3, 5, 7, 10];
 const SECONDS_OPTIONS = [60, 90, 120];
 
+function summaryOf(s: OndeSettings): string {
+  return `${s.rounds} rodadas · ${s.seconds}s por rodada · ${REGION_LABELS[s.region]} · ${SPREAD_LABELS[s.spread]}`;
+}
+
 const uid = ref('');
 const name = ref(localStorage.getItem('qeo:name') ?? '');
-const joinCode = ref('');
+const joinCode = ref(inviteCodeFromUrl());
 const code = ref('');
 const room = ref<OndeRoom | null>(null);
+const alerts = useDevtoolsAlerts('onde', code, name, computed(() => room.value?.status === 'playing'));
 const createSettings = ref<OndeSettings>({ ...DEFAULT_ONDE_SETTINGS });
 const message = ref('');
 const busy = ref(false);
@@ -68,6 +78,9 @@ onBeforeUnmount(() => {
 });
 
 const isHost = computed(() => !!room.value && room.value.hostUid === uid.value);
+const roomPlayers = computed(() =>
+  Object.entries(room.value?.players ?? {}).map(([id, p]) => ({ id, name: p.name, connected: p.connected })),
+);
 const round = computed(() => room.value?.round ?? null);
 const playing = computed(() => round.value?.status === 'playing');
 const revealed = computed(() => round.value?.status === 'reveal');
@@ -126,6 +139,7 @@ function enter(roomCode: string) {
   unsubRoom = subscribeOndeRoom(roomCode, (r) => {
     room.value = r;
   });
+  clearInviteFromUrl();
 }
 
 async function run(task: () => Promise<unknown>) {
@@ -174,7 +188,8 @@ async function nextRound() {
   if (!room.value) return;
   picking.value = true;
   try {
-    const pick = await findPhoto();
+    const { region, spread } = room.value.settings;
+    const pick = await findPhoto({ region, spread });
     await run(async () => {
       const result = await startOndeRound(code.value, pick);
       if (!result.committed) message.value = 'Outra rodada já começou. Atualize se necessário.';
@@ -212,6 +227,8 @@ function formatKm(km: number): string {
 
 onMounted(() => {
   ensureSignedIn().then((u) => (uid.value = u.uid)).catch(() => {});
+  // Link com ?sala=CODIGO: entra direto na sala (pede o nome se ainda não houver).
+  if (joinCode.value) void join();
 });
 </script>
 
@@ -231,7 +248,7 @@ onMounted(() => {
         <input v-model="name" maxlength="20" placeholder="Como você quer aparecer" />
       </label>
 
-      <SettingsDialog title="Configuração da partida" :summary="`${createSettings.rounds} rodadas · ${createSettings.seconds}s por rodada`">
+      <SettingsDialog title="Configuração da partida" :summary="summaryOf(createSettings)">
         <label class="pct">
           <span>Rodadas</span>
           <select :value="createSettings.rounds" @change="createSettings = { ...createSettings, rounds: Number(($event.target as HTMLSelectElement).value) }">
@@ -242,6 +259,18 @@ onMounted(() => {
           <span>Tempo por rodada</span>
           <select :value="createSettings.seconds" @change="createSettings = { ...createSettings, seconds: Number(($event.target as HTMLSelectElement).value) }">
             <option v-for="s in SECONDS_OPTIONS" :key="s" :value="s">{{ s }} segundos</option>
+          </select>
+        </label>
+        <label class="pct">
+          <span>Região fotografada</span>
+          <select :value="createSettings.region" @change="createSettings = { ...createSettings, region: ($event.target as HTMLSelectElement).value as RegionChoice }">
+            <option v-for="r in REGION_CHOICES" :key="r" :value="r">{{ REGION_LABELS[r] }}</option>
+          </select>
+        </label>
+        <label class="pct">
+          <span>Área do sorteio</span>
+          <select :value="createSettings.spread" @change="createSettings = { ...createSettings, spread: ($event.target as HTMLSelectElement).value as Spread }">
+            <option v-for="s in SPREADS" :key="s" :value="s">{{ SPREAD_LABELS[s] }}</option>
           </select>
         </label>
       </SettingsDialog>
@@ -266,20 +295,14 @@ onMounted(() => {
       <div class="code">
         <span class="muted">Código da sala</span>
         <strong>{{ code }}</strong>
-        <span class="muted small">{{ room.settings.rounds }} rodadas · {{ room.settings.seconds }}s por rodada</span>
+        <span class="muted small">{{ summaryOf(room.settings) }}</span>
       </div>
 
-      <h3>Jogadores ({{ Object.keys(room.players).length }})</h3>
-      <ul class="players">
-        <li v-for="(p, id) in room.players" :key="id">
-          {{ p.name }}
-          <span v-if="id === room.hostUid" class="tag">host</span>
-          <span v-if="id === uid" class="tag you">você</span>
-        </li>
-      </ul>
+      <RoomInvite :code="code" path="/onde-estou" />
+      <RoomPlayers :players="roomPlayers" :host-uid="room.hostUid" :my-uid="uid" />
 
       <template v-if="isHost">
-        <SettingsDialog title="Configuração da partida" :summary="`${room.settings.rounds} rodadas · ${room.settings.seconds}s por rodada`">
+        <SettingsDialog title="Configuração da partida" :summary="summaryOf(room.settings)">
           <label class="pct">
             <span>Rodadas</span>
             <select :value="room.settings.rounds" @change="changeSettings({ rounds: Number(($event.target as HTMLSelectElement).value) })">
@@ -290,6 +313,18 @@ onMounted(() => {
             <span>Tempo por rodada</span>
             <select :value="room.settings.seconds" @change="changeSettings({ seconds: Number(($event.target as HTMLSelectElement).value) })">
               <option v-for="s in SECONDS_OPTIONS" :key="s" :value="s">{{ s }} segundos</option>
+            </select>
+          </label>
+          <label class="pct">
+            <span>Região fotografada</span>
+            <select :value="room.settings.region" @change="changeSettings({ region: ($event.target as HTMLSelectElement).value as RegionChoice })">
+              <option v-for="r in REGION_CHOICES" :key="r" :value="r">{{ REGION_LABELS[r] }}</option>
+            </select>
+          </label>
+          <label class="pct">
+            <span>Área do sorteio</span>
+            <select :value="room.settings.spread" @change="changeSettings({ spread: ($event.target as HTMLSelectElement).value as Spread })">
+              <option v-for="s in SPREADS" :key="s" :value="s">{{ SPREAD_LABELS[s] }}</option>
             </select>
           </label>
         </SettingsDialog>
@@ -303,11 +338,15 @@ onMounted(() => {
 
     <!-- PARTIDA -->
     <section v-else-if="room.status === 'playing' && round" class="card">
+      <RoomAlerts :alerts="alerts" />
       <div class="status">
         <span>Rodada {{ round.n }} de {{ room.settings.rounds }}</span>
         <span v-if="playing" :class="{ urgent: secondsLeft <= 10 }">⏱ {{ secondsLeft }}s</span>
         <span v-else class="muted">Resultado</span>
       </div>
+      <p class="muted small">
+        Na sala: <template v-for="(p, i) in roomPlayers" :key="p.id">{{ i > 0 ? ', ' : '' }}<span :class="{ offline: p.connected === false }">{{ p.name }}</span></template>
+      </p>
 
       <div class="onde-layout">
         <figure class="photo">

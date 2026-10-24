@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue';
-import type { Difficulty, Question, WorkType } from '../data/questions';
+import type { Question, WorkType } from '../data/questions';
 import { isCorrectGuess } from '../game/answer';
 import { pointsFor } from '../game/scoring';
 import { blurPx } from '../game/reveal';
 import { buildPool } from '../game/catalog';
+import { DEFAULT_DIFFICULTY_MIX, DIFFICULTIES, DIFFICULTY_LABEL, type DifficultyMix } from '../game/difficulty';
 import { DEFAULT_MIX, GROUPS, GROUP_LABEL, pickRound, type Group, type Mix } from '../game/mix';
 import Multiplayer from '../components/Multiplayer.vue';
 import BrandLogo from '../components/BrandLogo.vue';
@@ -24,7 +25,7 @@ const phase = ref<Phase>('setup');
 const targetPoints = ref(100);
 const durationSec = ref(20);
 const selectedTypes = ref<WorkType[]>(['movie', 'series', 'game', 'anime']);
-const selectedDifficulties = ref<Difficulty[]>(['mainstream', 'hard']);
+const difficultyMix = ref<DifficultyMix>({ ...DEFAULT_DIFFICULTY_MIX });
 const mix = ref<Mix>({ ...DEFAULT_MIX });
 const blurOn = ref(false); // a rodada atual é de capa desfocada?
 
@@ -33,6 +34,11 @@ function setMix(group: Group, event: Event) {
   mix.value = { ...mix.value, [group]: value };
 }
 const mixTotal = computed(() => GROUPS.reduce((sum, g) => sum + mix.value[g], 0));
+function setDifficulty(difficulty: keyof DifficultyMix, event: Event) {
+  const value = Math.max(0, Number((event.target as HTMLInputElement).value) || 0);
+  difficultyMix.value = { ...difficultyMix.value, [difficulty]: value };
+}
+const difficultyTotal = computed(() => DIFFICULTIES.reduce((sum, d) => sum + difficultyMix.value[d], 0));
 // Link com ?sala=CODIGO abre direto no multijogador.
 const mode = ref<'solo' | 'multi'>(new URLSearchParams(window.location.search).has('sala') ? 'multi' : 'solo');
 
@@ -54,7 +60,7 @@ const pool = computed(() =>
     targetPoints: targetPoints.value,
     durationSec: durationSec.value,
     types: selectedTypes.value,
-    difficulties: selectedDifficulties.value,
+    difficultyMix: difficultyMix.value,
     mix: mix.value,
   }),
 );
@@ -62,9 +68,15 @@ const canStart = computed(() => pool.value.length > 0);
 const secondsLeft = computed(() => Math.ceil(remainingMs.value / 1000));
 
 /** Capa da pergunta atual: obras e também ator/personagem (que mostram a capa da obra). */
-const currentPoster = computed(() =>
-  current.value?.imageUrl ? { posterUrl: current.value.imageUrl } : undefined,
-);
+const currentPoster = computed(() => {
+  const q = current.value;
+  if (!q?.imageUrl || q.clueType === 'emoji' || q.clueType === 'phrase') return undefined;
+  const clearCover = q.clueType === 'image' && !blurOn.value && phase.value === 'playing';
+  return {
+    posterUrl: clearCover && q.clearImageUrl ? q.clearImageUrl : q.imageUrl,
+    hideTitle: clearCover && !q.clearImageUrl,
+  };
+});
 /** 0 = início da rodada, 1 = tempo esgotado. */
 const progress = computed(() => {
   const total = durationSec.value * 1000;
@@ -72,6 +84,7 @@ const progress = computed(() => {
 });
 /** Na revelação a capa aparece nítida; em rodadas nítidas nunca há desfoque. */
 const posterBlur = computed(() => (phase.value === 'playing' && blurOn.value ? blurPx(progress.value) : 0));
+const posterStyle = computed(() => (posterBlur.value > 0 ? { filter: `blur(${posterBlur.value}px)` } : undefined));
 
 function stopTimer() {
   if (tick) clearInterval(tick);
@@ -94,7 +107,7 @@ function nextRound() {
     phase.value = 'finished';
     return;
   }
-  const pick = pickRound(pool.value, usedIds.value, mix.value);
+  const pick = pickRound(pool.value, usedIds.value, mix.value, difficultyMix.value);
   if (!pick) {
     phase.value = 'finished';
     return;
@@ -137,7 +150,7 @@ function submit() {
   const text = guess.value.trim();
   if (!text) return;
 
-  if (isCorrectGuess(text, current.value.answers)) {
+  if (isCorrectGuess(text, current.value.answers, { titleAliases: !current.value.kind || current.value.kind === 'work' })) {
     const elapsed = performance.now() - startedAt;
     const points = pointsFor(elapsed, durationSec.value * 1000);
     endRound(true, points);
@@ -197,22 +210,18 @@ onBeforeUnmount(stopTimer);
       </fieldset>
 
       <fieldset>
-        <legend>Dificuldade</legend>
-        <label class="check">
+        <legend>Dificuldade (peso em %; total {{ difficultyTotal }})</legend>
+        <label v-for="d in DIFFICULTIES" :key="d" class="pct">
+          <span>{{ DIFFICULTY_LABEL[d] }}</span>
           <input
-            type="checkbox"
-            :checked="selectedDifficulties.includes('mainstream')"
-            @change="selectedDifficulties = toggled(selectedDifficulties, 'mainstream')"
+            type="number"
+            min="0"
+            max="100"
+            step="5"
+            :value="difficultyMix[d]"
+            @change="setDifficulty(d, $event)"
           />
-          Mainstream
-        </label>
-        <label class="check">
-          <input
-            type="checkbox"
-            :checked="selectedDifficulties.includes('hard')"
-            @change="selectedDifficulties = toggled(selectedDifficulties, 'hard')"
-          />
-          Difícil
+          <span class="muted">%</span>
         </label>
       </fieldset>
 
@@ -246,13 +255,14 @@ onBeforeUnmount(stopTimer);
         />
       </div>
 
-      <div class="clue" :class="current?.clueType">
+      <div :key="current?.id" class="clue" :class="current?.clueType">
         <img
           v-if="currentPoster"
           class="poster"
+          :class="{ 'title-hidden': currentPoster.hideTitle }"
           :src="currentPoster.posterUrl"
           alt="Capa"
-          :style="{ filter: `blur(${posterBlur}px)` }"
+          :style="posterStyle"
         />
         <span v-if="current?.clueType === 'emoji'" class="emoji">{{ current.clue }}</span>
         <p v-else-if="current?.clueType === 'character'" class="character">

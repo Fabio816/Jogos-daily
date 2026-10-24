@@ -15,7 +15,9 @@ if (!TMDB_TOKEN || !TWITCH_ID || !TWITCH_SECRET) {
 }
 
 const PER_TYPE = 200;
-const MAINSTREAM_TOP = 80; // os N primeiros de cada categoria são "mainstream"; o resto, "difícil"
+const EASY_TOP = 40;
+const MEDIUM_TOP = 80;
+const tierFor = (index) => (index < EASY_TOP ? 'easy' : index < MEDIUM_TOP ? 'medium' : 'hard');
 const CAST_PER_WORK = 2;
 const TMDB = 'https://api.themoviedb.org/3';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';
@@ -29,6 +31,8 @@ const images = existsSync(DATA('images.json')) ? JSON.parse(readFileSync(DATA('i
 const handcraftedTmdb = new Set(Object.values(images).map((v) => v.tmdbId).filter(Boolean));
 const handcraftedIgdb = new Set(Object.values(images).map((v) => v.igdbId).filter(Boolean));
 const handcraftedAnilist = new Set(Object.values(images).map((v) => v.anilistId).filter(Boolean));
+const previousWorks = existsSync(DATA('works.json')) ? JSON.parse(readFileSync(DATA('works.json'), 'utf-8')) : [];
+const clearImageById = new Map(previousWorks.filter((w) => w.clearImageUrl).map((w) => [w.id, w.clearImageUrl]));
 
 async function tmdb(path, params = {}) {
   const url = new URL(TMDB + path);
@@ -70,7 +74,7 @@ function toTmdbWork(r, type, index) {
   return {
     id: `w-${type}-${r.id}`,
     type,
-    difficulty: index < MAINSTREAM_TOP ? 'mainstream' : 'hard',
+    difficulty: tierFor(index),
     title,
     aliases: unique([original]).filter((a) => a !== title),
     year: date ? Number(date.slice(0, 4)) : undefined,
@@ -103,7 +107,7 @@ async function igdbGames() {
     .map((g, index) => ({
       id: `w-game-${g.id}`,
       type: 'game',
-      difficulty: index < MAINSTREAM_TOP ? 'mainstream' : 'hard',
+      difficulty: tierFor(index),
       title: g.name,
       aliases: [],
       year: g.first_release_date ? new Date(g.first_release_date * 1000).getUTCFullYear() : undefined,
@@ -141,7 +145,7 @@ async function anilistPopular() {
     .map((m, index) => ({
       id: `w-anime-${m.id}`,
       type: 'anime',
-      difficulty: index < MAINSTREAM_TOP ? 'mainstream' : 'hard',
+      difficulty: tierFor(index),
       title: m.title.english ?? m.title.romaji,
       aliases: unique([m.title.romaji, m.title.native]).filter((a) => a !== (m.title.english ?? m.title.romaji)),
       year: m.startDate.year ?? undefined,
@@ -161,7 +165,10 @@ const series = (await tmdbPopular('tv'))
   .map((r, i) => toTmdbWork(r, 'series', i));
 const games = await igdbGames();
 const anime = await anilistPopular();
-const works = [...movies, ...series, ...games, ...anime];
+const works = [...movies, ...series, ...games, ...anime].map((w) => {
+  const clearImageUrl = clearImageById.get(w.id);
+  return clearImageUrl ? { ...w, clearImageUrl } : w;
+});
 console.log(`Obras: ${movies.length} filmes, ${series.length} séries, ${games.length} jogos, ${anime.length} animes`);
 
 writeFileSync(DATA('works.json'), JSON.stringify(works, null, 2) + '\n', 'utf-8');
@@ -201,7 +208,7 @@ const tmdbWorks = [
       type: QUESTIONS.find((q) => q.id === id).type,
       tmdbId: v.tmdbId,
       title: v.tmdbTitle,
-      difficulty: 'mainstream',
+      difficulty: QUESTIONS.find((q) => q.id === id).difficulty,
     })),
   ...works
     .filter((w) => w.tmdbId)

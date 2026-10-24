@@ -1,28 +1,48 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import BrandLogo from '../components/BrandLogo.vue';
 import { ensureSignedIn } from '../firebase';
 import { serverNow } from '../lib/time';
 import { addRankingPoints } from '../lib/ranking';
+import { clearInviteFromUrl, inviteCodeFromUrl } from '../lib/invite';
+import RoomInvite from '../components/RoomInvite.vue';
+import RoomPlayers from '../components/RoomPlayers.vue';
+import RoomAlerts from '../components/RoomAlerts.vue';
+import { useDevtoolsAlerts } from '../lib/alerts';
 import { normalizeWord } from '../games/termo/logic';
 import { loadBombData, type BombData } from '../games/bomb/data';
-import { currentUid, isTurnExpired, MIN_PLAYERS, START_LIVES, turnSeconds, type BombRoom } from '../games/bomb/logic';
+import {
+  ACCEL_OPTIONS,
+  attemptProblem,
+  currentUid,
+  isTurnExpired,
+  MIN_PLAYERS,
+  MIN_TURN_SECONDS,
+  SAY_BUBBLE_MS,
+  START_LIVES,
+  turnSeconds,
+  type BombRoom,
+} from '../games/bomb/logic';
 import {
   createBombRoom,
   expireBombTurn,
   joinBombRoom,
+  setBombSay,
+  setBombTyping,
   startBomb,
   subscribeBombRoom,
   submitBombWord,
+  updateBombSettings,
 } from '../games/bomb/room';
 
 const data = ref<BombData | null>(null);
 const loadError = ref('');
 const uid = ref('');
 const name = ref(localStorage.getItem('qeo:name') ?? '');
-const joinCode = ref('');
+const joinCode = ref(inviteCodeFromUrl());
 const code = ref('');
 const room = ref<BombRoom | null>(null);
+const alerts = useDevtoolsAlerts('bomb', code, name, computed(() => room.value?.status === 'playing'));
 const now = ref(serverNow());
 const typing = ref('');
 const message = ref('');
@@ -52,7 +72,7 @@ const secondsLeft = computed(() => {
 });
 const turnProgress = computed(() => {
   if (!room.value || !playing.value) return 0;
-  const total = turnSeconds(room.value.turns) * 1000;
+  const total = room.value.turnMs ?? turnSeconds(room.value.turns) * 1000;
   return Math.min(1, Math.max(0, (room.value.deadline - now.value) / total));
 });
 const players = computed(() => {
@@ -65,6 +85,39 @@ const winnerName = computed(() => {
   return w ? (room.value?.players[w]?.name ?? '?') : null;
 });
 const turnName = computed(() => (turnUid.value ? room.value?.players[turnUid.value]?.name : ''));
+const accel = computed(() => room.value?.settings?.accel ?? 0);
+const ACCEL_LABEL: Record<number, string> = {
+  0: 'Desligada',
+  1: 'Leve: -1 s a cada acerto seguido',
+  2: 'Forte: -2 s a cada acerto seguido',
+};
+/**
+ * Balão de cada jogador. A última tentativa (certa ou errada) sobe por alguns segundos;
+ * enquanto o jogador da vez digita, mostra o texto em andamento.
+ */
+const bubbles = computed(() => {
+  const out: Record<string, { key: string | number; text: string; ok: boolean } | null> = {};
+  for (const p of players.value) {
+    out[p.id] = null;
+    const r = room.value;
+    if (!r) continue;
+    const s = r.say;
+    if (s && s.uid === p.id && now.value - s.ts < SAY_BUBBLE_MS) {
+      out[p.id] = { key: s.ts, text: s.text, ok: s.ok };
+      continue;
+    }
+    const t = r.typing;
+    if (playing.value && t && t.uid === p.id && p.id === turnUid.value && t.turn === r.turns && t.text) {
+      out[p.id] = { key: 'typing', text: t.text, ok: true };
+    }
+  }
+  return out;
+});
+const inputPlaceholder = computed(() => {
+  if (!room.value) return '';
+  if (myTurn.value) return `Palavra com ${room.value.syllable.toUpperCase()}…`;
+  return turnName.value ? `Aguardando ${turnName.value}…` : 'Aguardando a próxima vez…';
+});
 
 const BOMB_C = 2 * Math.PI * 64;
 const activeIndex = computed(() => players.value.findIndex((p) => p.id === turnUid.value));
@@ -103,6 +156,14 @@ function playerStyle(i: number) {
   };
 }
 
+/** Lado do balão: acima do avatar; nos assentos do topo vai para o lado, para não cortar na arena nem cobrir a seta. */
+function bubbleSide(i: number): 'above' | 'left' | 'right' {
+  const n = Math.max(1, players.value.length);
+  const rad = ((i / n) * 360 - 90) * (Math.PI / 180);
+  if (Math.sin(rad) >= -0.5) return 'above';
+  return Math.cos(rad) < 0 ? 'left' : 'right';
+}
+
 const turnArrowStyle = computed(() => {
   const n = Math.max(1, players.value.length);
   const i = activeIndex.value;
@@ -132,12 +193,45 @@ watch(
   },
 );
 
+// Digitação do jogador da vez vai para a sala (balão para os outros), no máximo a cada 150 ms.
+let typingPending: ReturnType<typeof setTimeout> | null = null;
+let typingLast = 0;
+function pushTyping() {
+  if (!code.value || !room.value || !myTurn.value) return;
+  const text = typing.value.trim() ? typing.value.trim().slice(0, 60) : '';
+  void setBombTyping(code.value, text ? { uid: uid.value, text, turn: room.value.turns } : null).catch(() => {});
+}
+function scheduleTyping() {
+  if (typingPending) return;
+  const wait = Math.max(0, 150 - (Date.now() - typingLast));
+  typingPending = setTimeout(() => {
+    typingPending = null;
+    typingLast = Date.now();
+    pushTyping();
+  }, wait);
+}
+watch(typing, scheduleTyping);
+
+const inputRef = ref<HTMLInputElement | null>(null);
+watch(myTurn, (on) => {
+  if (on) void nextTick(() => inputRef.value?.focus());
+});
+
+function setAccel(event: Event) {
+  const value = Number((event.target as HTMLSelectElement).value);
+  return runAction(async () => {
+    const result = await updateBombSettings(code.value, uid.value, value);
+    if (!result.committed) message.value = 'Não foi possível salvar a configuração.';
+  });
+}
+
 async function enterRoom(roomCode: string) {
   code.value = roomCode;
   unsubRoom?.();
   unsubRoom = subscribeBombRoom(roomCode, (r) => {
     room.value = r;
   });
+  clearInviteFromUrl();
 }
 
 async function runAction(task: () => Promise<void>) {
@@ -182,23 +276,25 @@ function start() {
 }
 
 async function send() {
-  if (!myTurn.value || !data.value || !room.value) return;
-  const word = normalizeWord(typing.value);
-  if (!word) return;
-  const syllable = room.value.syllable;
-  if (!word.includes(syllable)) {
-    message.value = `A palavra precisa conter "${syllable.toUpperCase()}".`;
-    return;
-  }
-  const valid = data.value.dictionary.has(word);
-  if (!valid) {
-    message.value = 'Essa palavra não está no dicionário.';
-    return;
-  }
+  if (!myTurn.value || !data.value || !room.value || !code.value) return;
+  const raw = typing.value.trim();
+  if (!raw) return;
+  const word = normalizeWord(raw);
+  const text = raw.slice(0, 60);
+  // O texto sobe para o balão e a caixa esvazia, mesmo se a palavra estiver errada.
   typing.value = '';
+  const problem = attemptProblem(room.value, word, data.value.dictionary.has(word));
+  if (problem) {
+    // Erro não encerra a vez: quem errou continua chutando até o tempo acabar.
+    message.value = problem;
+    void setBombSay(code.value, { uid: uid.value, text, ok: false, ts: serverNow() }).catch(() => {});
+    return;
+  }
   message.value = '';
-  const result = await submitBombWord(code.value, uid.value, word, valid, data.value.syllables).catch(() => null);
-  if (!result?.committed) message.value = 'Tempo esgotado ou palavra já usada. Tente outra.';
+  const result = await submitBombWord(code.value, uid.value, word, true, data.value.syllables).catch(() => null);
+  const ok = !!result?.committed;
+  void setBombSay(code.value, { uid: uid.value, text, ok, ts: serverNow() }).catch(() => {});
+  if (!ok) message.value = 'Tempo esgotado ou palavra já usada. Tente outra.';
 }
 
 function leave() {
@@ -209,25 +305,22 @@ function leave() {
   typing.value = '';
 }
 
-function onKey(event: KeyboardEvent) {
-  if (event.key === 'Enter' && myTurn.value) void send();
-}
-
 onMounted(async () => {
-  window.addEventListener('keydown', onKey);
   try {
     data.value = await loadBombData();
     uid.value = (await ensureSignedIn()).uid;
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : 'Erro ao carregar o Bomb Party.';
   }
+  // Link com ?sala=CODIGO: entra direto na sala (pede o nome se ainda não houver).
+  if (joinCode.value) void join();
 });
 
 onBeforeUnmount(() => {
   clearInterval(timer);
-  window.removeEventListener('keydown', onKey);
   unsubRoom?.();
   if (hitTimer) clearTimeout(hitTimer);
+  if (typingPending) clearTimeout(typingPending);
 });
 </script>
 
@@ -270,15 +363,17 @@ onBeforeUnmount(() => {
           <span class="muted">Código da sala</span>
           <strong>{{ code }}</strong>
         </div>
-        <h3>Jogadores ({{ players.length }})</h3>
-        <ul class="players">
-          <li v-for="p in players" :key="p.id">
-            {{ p.name }}
-            <span v-if="p.id === room.hostUid" class="tag">host</span>
-            <span v-if="p.id === uid" class="tag you">você</span>
-          </li>
-        </ul>
+        <RoomInvite :code="code" path="/bomb-party" />
+        <RoomPlayers :players="players" :host-uid="room.hostUid" :my-uid="uid" />
         <p class="muted small">Cada jogador começa com {{ START_LIVES }} vidas. Quem zerar as vidas sai.</p>
+        <label v-if="isHost">
+          Aceleração por acerto seguido
+          <select :value="accel" @change="setAccel">
+            <option v-for="v in ACCEL_OPTIONS" :key="v" :value="v">{{ ACCEL_LABEL[v] }}</option>
+          </select>
+        </label>
+        <p v-else class="muted small">Aceleração: {{ ACCEL_LABEL[accel] }}</p>
+        <p v-if="accel > 0" class="muted small">Quem acerta seguido joga com o tempo cada vez menor (mínimo de {{ MIN_TURN_SECONDS }} s). Errar ou estourar o tempo zera a sequência.</p>
         <button v-if="isHost" :disabled="busy || players.length < MIN_PLAYERS" @click="start">
           Começar partida
         </button>
@@ -289,6 +384,7 @@ onBeforeUnmount(() => {
 
       <!-- PARTIDA -->
       <section v-else-if="room.status === 'playing'" class="card bomb-game">
+        <RoomAlerts :alerts="alerts" />
         <div class="bomb-head">
           <span class="bomb-turn" :class="{ mine: myTurn }">
             <span class="bomb-dot" aria-hidden="true"></span>
@@ -309,6 +405,12 @@ onBeforeUnmount(() => {
               :class="{ active: p.id === turnUid, out: p.lives <= 0, me: p.id === uid, hit: p.id === hitUid }"
               :style="playerStyle(i)"
             >
+              <span
+                v-if="bubbles[p.id]"
+                :key="bubbles[p.id]?.key"
+                class="bomb-bubble"
+                :class="[bubbleSide(i), { bad: bubbles[p.id]?.ok === false }]"
+              >{{ bubbles[p.id]?.text }}</span>
               <span class="bomb-pname">
                 {{ p.name }}<span v-if="p.id === uid" class="bomb-you">você</span>
               </span>
@@ -325,6 +427,7 @@ onBeforeUnmount(() => {
                 </template>
                 <span v-else class="bomb-out">fora</span>
               </span>
+              <span v-if="accel > 0 && (p.streak ?? 0) >= 2" class="bomb-streak">{{ p.streak }} seguidas</span>
             </div>
 
             <div class="bomb-core" :class="{ warn: secondsLeft <= 6, urgent: secondsLeft <= 3, mine: myTurn }">
@@ -357,21 +460,17 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <form v-if="myTurn" class="row bomb-form" @submit.prevent="send">
+        <form class="row bomb-form" @submit.prevent="send">
           <input
+            ref="inputRef"
             v-model="typing"
-            autofocus
             autocomplete="off"
-            :placeholder="`Palavra com ${room.syllable.toUpperCase()}…`"
+            :disabled="!myTurn"
+            :placeholder="inputPlaceholder"
           />
-          <button type="submit">Enviar</button>
+          <button type="submit" :disabled="!myTurn || !typing.trim()">Enviar</button>
         </form>
-        <p v-else class="bomb-wait">
-          <template v-if="turnName">Aguardando <strong>{{ turnName }}</strong>…</template>
-          <template v-else>Aguardando a próxima vez…</template>
-        </p>
-
-        <p v-if="message" class="bad">{{ message }}</p>
+        <p class="bomb-feedback bad" aria-live="polite">{{ message }}</p>
         <p v-if="room.event" class="bomb-event">{{ room.event.text }}</p>
 
         <button class="ghost" @click="leave">Sair da sala</button>
@@ -382,6 +481,12 @@ onBeforeUnmount(() => {
         <h2>Fim de partida</h2>
         <p v-if="winnerName">Vencedor: <strong>{{ winnerName }}</strong> 💣</p>
         <p v-if="room.event" class="event">{{ room.event.text }}</p>
+        <label v-if="isHost">
+          Aceleração por acerto seguido
+          <select :value="accel" @change="setAccel">
+            <option v-for="v in ACCEL_OPTIONS" :key="v" :value="v">{{ ACCEL_LABEL[v] }}</option>
+          </select>
+        </label>
         <button v-if="isHost" :disabled="busy" @click="start">Jogar de novo</button>
         <p v-else class="muted">Aguardando o host começar outra partida…</p>
         <button class="ghost" @click="leave">Sair da sala</button>

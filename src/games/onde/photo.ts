@@ -1,4 +1,4 @@
-import { AREAS, jitteredAround } from './geo';
+import { areasFor, jitteredAround, SPREAD_DEG, type RegionChoice, type Spread } from './geo';
 import type { Pick } from './state';
 
 const TOKEN = import.meta.env.VITE_MAPILLARY_TOKEN as string | undefined;
@@ -6,6 +6,11 @@ const BBOX_HALF = 0.005; // caixa de 0,01 grau (limite da API do Mapillary)
 const ATTEMPTS = 25;
 
 export class PhotoError extends Error {}
+
+export interface PhotoOptions {
+  region: RegionChoice;
+  spread: Spread;
+}
 
 interface MapillaryImage {
   id: string | number;
@@ -16,15 +21,20 @@ interface MapillaryImage {
 }
 
 /**
- * Sorteia uma foto 360° do Mapillary perto de uma região com boa cobertura.
+ * Sorteia uma foto 360° do Mapillary perto de uma área da região escolhida.
  * A API filtra com `is_pano=true`; fotos comuns não entram.
  */
-export async function findPhoto(rng: () => number = Math.random): Promise<Pick> {
+export async function findPhoto(
+  options: PhotoOptions = { region: 'mundo', spread: 'cidade' },
+  rng: () => number = Math.random,
+): Promise<Pick> {
   if (!TOKEN) throw new PhotoError('Falta VITE_MAPILLARY_TOKEN no arquivo .env.');
+  const areas = areasFor(options.region);
+  const spreadDeg = SPREAD_DEG[options.spread];
 
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
-    const area = AREAS[Math.floor(rng() * AREAS.length)];
-    const c = jitteredAround(area, rng);
+    const area = areas[Math.floor(rng() * areas.length)];
+    const c = jitteredAround(area, rng, spreadDeg);
     const bbox = [c.lon - BBOX_HALF, c.lat - BBOX_HALF, c.lon + BBOX_HALF, c.lat + BBOX_HALF].join(',');
 
     const url = new URL('https://graph.mapillary.com/images');

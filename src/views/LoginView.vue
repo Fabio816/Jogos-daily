@@ -26,7 +26,7 @@ function submit() {
   <main class="app login">
     <header class="brand">
       <BrandLogo />
-      <h1>Claude Games</h1>
+      <h1>Claudio Games</h1>
       <p class="sub">Área da turma. Digite a senha para entrar.</p>
     </header>
 

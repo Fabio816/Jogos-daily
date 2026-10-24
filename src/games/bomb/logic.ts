@@ -1,10 +1,41 @@
 export const START_LIVES = 2;
 export const MIN_PLAYERS = 2;
+/** Menor duração de um turno, mesmo com aceleração. */
+export const MIN_TURN_SECONDS = 3;
+/** Valores aceitos para a aceleração (segundos a menos por acerto seguido). */
+export const ACCEL_OPTIONS: readonly number[] = [0, 1, 2];
+/** Quanto tempo a última tentativa fica no balão (ms). */
+export const SAY_BUBBLE_MS = 1500;
 
 export interface BombPlayer {
   name: string;
   lives: number;
   joinedAt: number;
+  /** Presença: false quando a conexão cai. */
+  connected?: boolean;
+  /** Acertos seguidos (zera quando o tempo estoura). */
+  streak?: number;
+}
+
+export interface BombSettings {
+  /** Segundos a menos no turno de quem acerta seguido, por acerto seguido (0 = desligado). */
+  accel: number;
+}
+
+/** O que o jogador da vez está digitando (aparece no balão acima do avatar). */
+export interface BombTyping {
+  uid: string;
+  text: string;
+  /** `turns` no momento da digitação: texto de turno anterior é ignorado. */
+  turn: number;
+}
+
+/** Última tentativa enviada: sobe para o balão do jogador, certa ou errada. */
+export interface BombSay {
+  uid: string;
+  text: string;
+  ok: boolean;
+  ts: number;
 }
 
 export interface BombRoom {
@@ -20,14 +51,27 @@ export interface BombRoom {
   syllable: string;
   /** Prazo do turno atual (ms, relógio do servidor). */
   deadline: number;
+  /** Duração do turno atual (ms). */
+  turnMs?: number;
   used: Record<string, boolean>;
+  settings?: BombSettings;
+  typing?: BombTyping;
+  say?: BombSay;
   winnerUid?: string;
   event?: { text: string; ts: number };
 }
 
-/** Tempo do turno: 12 s no início, diminui 1 s a cada 8 turnos, mínimo de 5 s. */
+/** Tempo base do turno: 12 s no início, diminui 1 s a cada 8 turnos, mínimo de 5 s. */
 export function turnSeconds(turns: number): number {
   return Math.max(5, 12 - Math.floor(turns / 8));
+}
+
+/** Duração do turno de `uid`: tempo base menos a aceleração pelos acertos seguidos dele. */
+export function turnMsFor(room: BombRoom, uid: string): number {
+  const accel = room.settings?.accel ?? 0;
+  const streak = room.players[uid]?.streak ?? 0;
+  const seconds = Math.max(MIN_TURN_SECONDS, turnSeconds(room.turns) - accel * streak);
+  return seconds * 1000;
 }
 
 export function currentUid(room: BombRoom): string | undefined {
@@ -56,18 +100,29 @@ function pick<T>(items: readonly T[], rng: () => number): T {
   return items[Math.floor(rng() * items.length)];
 }
 
-/** Passa a vez para o próximo jogador vivo e sorteia nova sílaba. */
-function advance(room: BombRoom, now: number, syllables: readonly string[], rng: () => number): BombRoom {
+/**
+ * Passa a vez para o próximo jogador vivo e define o prazo dele.
+ * Acerto sorteia sílaba nova; tempo estourado mantém a sílaba para o próximo.
+ */
+function advance(
+  room: BombRoom,
+  now: number,
+  syllables: readonly string[],
+  rng: () => number,
+  keepSyllable = false,
+): BombRoom {
   const alive = aliveOf(room);
   if (alive.length <= 1) {
-    return { ...room, status: 'finished', winnerUid: alive[0] };
+    return { ...room, status: 'finished', winnerUid: alive[0], typing: undefined };
   }
   const nextIdx = nextAliveIndex(room, room.turn);
+  const next: BombRoom = { ...room, turn: nextIdx, typing: undefined };
+  const ms = turnMsFor(next, room.order[nextIdx]);
   return {
-    ...room,
-    turn: nextIdx,
-    syllable: pick(syllables, rng),
-    deadline: now + turnSeconds(room.turns) * 1000,
+    ...next,
+    syllable: keepSyllable ? room.syllable : pick(syllables, rng),
+    deadline: now + ms,
+    turnMs: ms,
   };
 }
 
@@ -85,21 +140,43 @@ export function applyStart(
   if (order.length < MIN_PLAYERS) return null;
 
   const players = Object.fromEntries(
-    order.map((uid) => [uid, { ...room.players[uid], lives: START_LIVES }]),
+    order.map((uid) => [uid, { ...room.players[uid], lives: START_LIVES, streak: 0 }]),
   );
-  return {
+  const started: BombRoom = {
     ...room,
     status: 'playing',
     players,
     order,
     turn: 0,
     turns: 0,
-    syllable: pick(syllables, rng),
-    deadline: now + turnSeconds(0) * 1000,
     used: {},
     winnerUid: undefined,
+    typing: undefined,
+  };
+  const ms = turnMsFor(started, order[0]);
+  return {
+    ...started,
+    syllable: pick(syllables, rng),
+    deadline: now + ms,
+    turnMs: ms,
     event: { text: `Começou! Vez de ${players[order[0]].name}.`, ts: now },
   };
+}
+
+/** Configuração de aceleração. Só o host, e só no lobby ou depois de uma partida. */
+export function applySettings(room: BombRoom, uid: string, accel: number): BombRoom | null {
+  if (room.hostUid !== uid) return null;
+  if (room.status === 'playing') return null;
+  if (!ACCEL_OPTIONS.includes(accel)) return null;
+  return { ...room, settings: { accel } };
+}
+
+/** Motivo para recusar uma tentativa, ou null se a palavra pode ser enviada. */
+export function attemptProblem(room: BombRoom, word: string, inDictionary: boolean): string | null {
+  if (!word.includes(room.syllable)) return `A palavra precisa conter "${room.syllable.toUpperCase()}".`;
+  if (!inDictionary) return 'Essa palavra não está no dicionário.';
+  if (room.used[word]) return 'Essa palavra já foi usada.';
+  return null;
 }
 
 /** Palavra enviada pelo jogador da vez. `valid` vem do dicionário (checado no cliente). */
@@ -116,17 +193,18 @@ export function applySubmit(
   if (currentUid(room) !== uid || now >= room.deadline) return null;
   if (!valid || !word.includes(room.syllable) || room.used[word]) return null;
 
-  const name = room.players[uid]?.name ?? '?';
+  const player = room.players[uid];
   const next: BombRoom = {
     ...room,
+    players: { ...room.players, [uid]: { ...player, streak: (player?.streak ?? 0) + 1 } },
     used: { ...room.used, [word]: true },
     turns: room.turns + 1,
-    event: { text: `${name} disse ${word}.`, ts: now },
+    event: { text: `${player?.name ?? '?'} disse ${word}.`, ts: now },
   };
   return advance(next, now, syllables, rng);
 }
 
-/** Tempo esgotado: o jogador da vez perde uma vida. */
+/** Tempo esgotado: o jogador da vez perde uma vida e zera a sequência de acertos. */
 export function applyTimeout(
   room: BombRoom,
   now: number,
@@ -142,9 +220,9 @@ export function applyTimeout(
   const text = lives === 0 ? `${player.name} foi eliminado!` : `${player.name} perdeu uma vida.`;
   const next: BombRoom = {
     ...room,
-    players: { ...room.players, [uid]: { ...player, lives } },
+    players: { ...room.players, [uid]: { ...player, lives, streak: 0 } },
     turns: room.turns + 1,
     event: { text, ts: now },
   };
-  return advance(next, now, syllables, rng);
+  return advance(next, now, syllables, rng, true);
 }

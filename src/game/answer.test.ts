@@ -40,9 +40,50 @@ describe('isCorrectGuess', () => {
     expect(isCorrectGuess('ro', ['Ra'])).toBe(false);
   });
 
+  it('equipara & e e', () => {
+    expect(isCorrectGuess('Lei e Ordem', ['Lei & Ordem'])).toBe(true);
+  });
+
   it('rejeita respostas erradas e vazias', () => {
     expect(isCorrectGuess('vingadores', answers)).toBe(false);
     expect(isCorrectGuess('   ', answers)).toBe(false);
+  });
+});
+
+describe('isCorrectGuess com título principal', () => {
+  const harry = ['Harry Potter e a Pedra Filosofal', "Harry Potter and the Sorcerer's Stone"];
+
+  it('aceita apenas o título principal', () => {
+    expect(isCorrectGuess('Harry Potter', harry, { titleAliases: true })).toBe(true);
+    expect(isCorrectGuess('harry potter', harry, { titleAliases: true })).toBe(true);
+    expect(isCorrectGuess('Hary Potter', harry, { titleAliases: true })).toBe(true);
+  });
+
+  it('mantém o título completo válido', () => {
+    expect(isCorrectGuess('Harry Potter e a Pedra Filosofal', harry, { titleAliases: true })).toBe(true);
+  });
+
+  it('exige a opção para aceitar título parcial', () => {
+    expect(isCorrectGuess('Harry Potter', harry)).toBe(false);
+  });
+
+  it('aceita o título antes de dois-pontos', () => {
+    expect(isCorrectGuess('Vingadores', ['Vingadores: Ultimato'], { titleAliases: true })).toBe(true);
+    expect(isCorrectGuess('O Senhor dos Anéis', ['O Senhor dos Anéis: O Retorno do Rei'], { titleAliases: true })).toBe(true);
+  });
+
+  it('normaliza & dentro do título principal', () => {
+    expect(isCorrectGuess('Dungeons e Dragons', ['Dungeons & Dragons: Honra Entre Ladrões'], { titleAliases: true })).toBe(true);
+  });
+
+  it('não aceita base curta de conjunção', () => {
+    expect(isCorrectGuess('Rick', ['Rick e Morty'], { titleAliases: true })).toBe(false);
+  });
+
+  it('aceita o título base antes de temporada, parte ou ano', () => {
+    expect(isCorrectGuess('Attack on Titan', ['Attack on Titan Season 2'], { titleAliases: true })).toBe(true);
+    expect(isCorrectGuess('The Last of Us', ['The Last of Us Part II'], { titleAliases: true })).toBe(true);
+    expect(isCorrectGuess('Hunter x Hunter', ['Hunter x Hunter (2011)'], { titleAliases: true })).toBe(true);
   });
 });
 

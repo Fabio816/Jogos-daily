@@ -64,7 +64,7 @@ for (const work of works) {
         id: `ator-${work.id}-${i + 1}`,
         kind: 'actor',
         type: work.type,
-        difficulty: i === 0 ? 'mainstream' : 'hard',
+        difficulty: work.difficulty,
         clueType: 'character',
         clue: c.character,
         workTitle: tmdbTitle,

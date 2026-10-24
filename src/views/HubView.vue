@@ -90,8 +90,9 @@ const GAMES: GameCard[] = [
   <main class="app hub">
     <header class="brand">
       <BrandLogo />
-      <h1>Claude Games</h1>
+      <h1>Claudio Games</h1>
       <p class="sub">Escolha um jogo e divirta-se com a galera.</p>
+      <RouterLink class="changelog-link" to="/novidades">Novidades da versão →</RouterLink>
     </header>
 
     <section class="window">

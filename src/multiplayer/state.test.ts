@@ -148,6 +148,31 @@ describe('normalizeRoom', () => {
     expect(room.round).toBeNull();
     expect(room.settings.types).toEqual([]);
     expect(room.settings.targetPoints).toBe(50);
+    expect(room.settings.difficultyMix).toEqual({ easy: 30, medium: 40, hard: 30 });
+    expect(room.settings.mix.emoji).toBe(8);
+    expect(room.settings.mix.frase).toBe(7);
+  });
+
+  it('migra salas antigas: texto vira emoji + frase e dificuldades viram pesos', () => {
+    const room = normalizeRoom({
+      hostUid: 'h',
+      settings: {
+        types: ['movie'],
+        difficulties: ['mainstream'],
+        mix: { capa: 50, texto: 20, ator: 30 },
+      },
+    });
+    expect(room.settings.mix.emoji + room.settings.mix.frase).toBe(20);
+    expect(room.settings.mix).toMatchObject({ capa: 50, ator: 30, personagem: 10 });
+    expect(room.settings.difficultyMix).toEqual({ easy: 30, medium: 30, hard: 0 });
+  });
+
+  it('mantém difficultyMix válido que veio do banco', () => {
+    const room = normalizeRoom({
+      hostUid: 'h',
+      settings: { difficultyMix: { easy: 10, medium: 20, hard: 70 } },
+    });
+    expect(room.settings.difficultyMix).toEqual({ easy: 10, medium: 20, hard: 70 });
   });
 
   it('converte listas que chegam como objeto', () => {

@@ -82,6 +82,12 @@ describe('rodadas', () => {
 });
 
 describe('normalização', () => {
+  it('região e área inválidas caem no padrão; válidas são mantidas', () => {
+    const base = { hostUid: 'a', status: 'lobby', players: {}, round: null, used: {} };
+    expect(normalizeOndeRoom({ ...base, settings: { region: 'marte', spread: 'x' } }).settings).toMatchObject({ region: 'mundo', spread: 'cidade' });
+    expect(normalizeOndeRoom({ ...base, settings: { region: 'europa', spread: 'bairro' } }).settings).toMatchObject({ region: 'europa', spread: 'bairro' });
+    expect(normalizeOndeRoom({ ...base, settings: {} }).settings).toMatchObject({ rounds: 5, seconds: 90, region: 'mundo', spread: 'cidade' });
+  });
   it('reconstrói palpites e resultados que o banco omitiu', () => {
     const r = normalizeOndeRoom({ hostUid: 'a', status: 'lobby', round: { n: 1, lat: 0, lon: 0, status: 'playing', startedAt: 0, durationMs: 1, imageId: 'x', imageUrl: 'u', creator: 'c' } });
     expect(r.round?.guesses).toEqual({});

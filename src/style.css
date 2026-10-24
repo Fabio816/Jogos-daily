@@ -1,6 +1,6 @@
 /* ==========================================================================
    QUAL É A OBRA? — sistema de design
-   Tema "Claude games": papel creme, tinta quente, terracota e verde-sálvia.
+   Tema "Claudio games": papel creme, tinta quente, terracota e verde-sálvia.
    Títulos serifados, interface limpa e sombras suaves.
    ========================================================================== */
 
@@ -331,6 +331,7 @@ button.ghost:active:not(:disabled) { box-shadow: none; }
   box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.1);
   transition: filter 0.25s linear;
 }
+.poster.title-hidden { filter: blur(8px); }
 
 .reveal { display: grid; gap: 10px; justify-items: center; animation: rise 0.35s ease-out; }
 .reveal .answer, .answer { font-size: 1.05rem; }
@@ -633,6 +634,39 @@ button.ghost:active:not(:disabled) { box-shadow: none; }
   box-shadow: 0 0 0 3px rgba(242, 193, 78, 0.12), 0 0 20px rgba(242, 193, 78, 0.22);
 }
 .bomb-player.active .bomb-pname { color: #fff; }
+.bomb-bubble {
+  --bubble-bg: #f7f3e8;
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  z-index: 4;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 190px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: var(--bubble-bg);
+  color: #211e1a;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: left;
+  overflow-wrap: anywhere;
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  animation: bomb-bubble-in 0.18s ease-out;
+}
+.bomb-bubble.bad { --bubble-bg: #e4685c; color: #fff; }
+.bomb-bubble::after { content: ''; position: absolute; border: 6px solid transparent; }
+.bomb-bubble.above::after { top: 100%; left: 50%; margin-left: -6px; border-top-color: var(--bubble-bg); }
+.bomb-bubble.left,
+.bomb-bubble.right { top: 50%; bottom: auto; transform: translateY(-50%); }
+.bomb-bubble.right { left: calc(100% + 10px); }
+.bomb-bubble.left { left: auto; right: calc(100% + 10px); }
+.bomb-bubble.right::after { right: 100%; top: 50%; margin-top: -6px; border-right-color: var(--bubble-bg); }
+.bomb-bubble.left::after { left: 100%; top: 50%; margin-top: -6px; border-left-color: var(--bubble-bg); }
+@keyframes bomb-bubble-in { from { opacity: 0; } }
+.bomb-streak { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.04em; color: #f2c14e; }
 .bomb-player.out { opacity: 0.38; filter: grayscale(1); }
 .bomb-player.hit .bomb-avatar { animation: bomb-hit 0.6s ease; }
 @keyframes bomb-hit {
@@ -701,8 +735,9 @@ button.ghost:active:not(:disabled) { box-shadow: none; }
 
 .bomb-form { margin-top: 2px; }
 .bomb-form input { font-size: 1rem; padding: 12px 14px; }
-.bomb-wait { margin: 0; text-align: center; color: var(--muted); font-size: 0.92rem; }
-.bomb-wait strong { color: var(--text); }
+.bomb-feedback { margin: 0; min-height: 1.3em; text-align: center; font-size: 0.85rem; }
+.bomb-form input:disabled { opacity: 0.55; cursor: not-allowed; }
+.bomb-form button:disabled { opacity: 0.45; cursor: not-allowed; }
 .bomb-event { margin: 0; text-align: center; font-size: 0.85rem; color: var(--muted); font-style: italic; }
 .event { color: var(--muted); font-style: italic; text-align: center; }
 
@@ -983,3 +1018,26 @@ button.ghost:active:not(:disabled) { box-shadow: none; }
 :root[data-theme='dark'] .poster {
   box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(244, 241, 232, 0.08);
 }
+
+/* ---------- avisos de DevTools em partida online (em vermelho) ---------- */
+.room-alerts { display: grid; gap: 6px; margin: 0 0 12px; }
+.room-alert {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #c0392b;
+  background: #fbe3df;
+  color: #a3211a;
+  font-size: 0.9rem;
+}
+.room-alert-why { color: #7a1a13; font-size: 0.8rem; }
+:root[data-theme='dark'] .room-alert { background: #3a1714; color: #ff9d92; border-color: #e0584a; }
+:root[data-theme='dark'] .room-alert-why { color: #ffb8ae; }
+
+/* ---------- novidades ---------- */
+.changelog-link { display: inline-block; margin-top: 6px; font-size: 0.9rem; color: var(--muted); }
+.changelog { display: grid; gap: 18px; max-width: 720px; margin: 0 auto; }
+.changelog h2 { margin: 0 0 4px; }
+.changelog h3 { margin: 12px 0 4px; font-size: 1rem; }
+.changelog ul { margin: 0; padding-left: 20px; }
+.changelog li { margin: 4px 0; }

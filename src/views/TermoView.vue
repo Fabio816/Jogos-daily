@@ -4,14 +4,20 @@ import BrandLogo from '../components/BrandLogo.vue';
 import RankingPanel from '../components/RankingPanel.vue';
 import TermoKeyboard from '../components/TermoKeyboard.vue';
 import TermoMulti from '../components/TermoMulti.vue';
+import RoomInvite from '../components/RoomInvite.vue';
+import RoomPlayers from '../components/RoomPlayers.vue';
+import RoomAlerts from '../components/RoomAlerts.vue';
+import { useDevtoolsAlerts } from '../lib/alerts';
 import SettingsDialog from '../components/SettingsDialog.vue';
 import { ensureSignedIn } from '../firebase';
 import { addRankingPoints } from '../lib/ranking';
+import { clearInviteFromUrl, inviteCodeFromUrl } from '../lib/invite';
 import { applyGame, isLost, isWon, marksPerBoard, type GameState } from '../games/termo/game';
 import {
   BOARD_LABEL,
   BOARD_OPTIONS,
   MAX_WORDS,
+  eraseAt,
   MIN_TRIES,
   MIN_WORDS,
   WORD_LEN,
@@ -41,7 +47,7 @@ import {
 } from '../games/termo/state';
 
 type Tab = 'solo' | 'sala';
-const tab = ref<Tab>('solo');
+const tab = ref<Tab>(inviteCodeFromUrl() ? 'sala' : 'solo');
 const data = ref<TermoData | null>(null);
 const loadError = ref('');
 const uid = ref('');
@@ -156,8 +162,9 @@ function soloNext() {
 
 // ---------- sala ----------
 const code = ref('');
-const joinCode = ref('');
+const joinCode = ref(inviteCodeFromUrl());
 const room = ref<TermoRoom | null>(null);
+const alerts = useDevtoolsAlerts('termo', code, name, computed(() => room.value?.status === 'playing'));
 const roomTyping = ref<string[]>(emptyTyping());
 const roomCursor = ref(0);
 const busy = ref(false);
@@ -186,6 +193,9 @@ const others = computed(() =>
     .filter(([id]) => id !== uid.value)
     .map(([id, p]) => ({ id, ...p })),
 );
+const roomPlayers = computed(() =>
+  Object.entries(room.value?.players ?? {}).map(([id, p]) => ({ id, name: p.name, connected: p.connected })),
+);
 const standings = computed(() =>
   Object.entries(room.value?.players ?? {})
     .map(([id, p]) => ({ id, name: p.name, score: p.score }))
@@ -212,6 +222,7 @@ async function enterRoom(roomCode: string) {
   unsubRoom = subscribeTermoRoom(roomCode, (r) => {
     room.value = r;
   });
+  clearInviteFromUrl();
 }
 
 async function runRoomAction(task: () => Promise<void>) {
@@ -319,14 +330,13 @@ function typeLetter(ch: string) {
   message.value = '';
 }
 
+/** Apaga a letra da célula selecionada (ou a anterior, se ela estiver vazia). */
 function backspace() {
   const t = activeTyping();
-  if (!t.canType || t.cursor() <= 0) return;
-  const pos = t.cursor() - 1;
-  const letters = [...t.get()];
-  letters[pos] = '';
-  t.set(letters);
-  t.setCursor(pos);
+  if (!t.canType) return;
+  const next = eraseAt(t.get(), t.cursor());
+  t.set(next.letters);
+  t.setCursor(next.cursor);
 }
 
 function clearTyping() {
@@ -406,6 +416,8 @@ onMounted(async () => {
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : 'Erro ao carregar o Termo.';
   }
+  // Link com ?sala=CODIGO: entra direto na sala (pede o nome se ainda não houver).
+  if (joinCode.value) void joinRoom();
 });
 
 onBeforeUnmount(() => {
@@ -518,6 +530,7 @@ onBeforeUnmount(() => {
 
       <template v-else-if="room">
         <section class="card">
+          <RoomAlerts :alerts="alerts" />
           <div class="code">
             <span class="muted">Código da sala</span>
             <strong>{{ code }}</strong>
@@ -525,6 +538,9 @@ onBeforeUnmount(() => {
               {{ BOARD_LABEL[boards] }} · {{ room.settings.words }} rodada(s) · {{ room.settings.tries }} tentativas
             </span>
           </div>
+
+          <RoomInvite :code="code" path="/termo" />
+          <RoomPlayers v-if="!room.round" :players="roomPlayers" :host-uid="room.hostUid" :my-uid="uid" />
 
           <SettingsDialog v-if="isHost && room.status === 'lobby'" title="Configuração da partida" :summary="summarize(room.settings)">
             <label class="pct">

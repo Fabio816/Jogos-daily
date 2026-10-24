@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { applyStart, applySubmit, applyTimeout, currentUid, turnSeconds, type BombRoom } from './logic';
+import {
+  attemptProblem,
+  applySettings,
+  applyStart,
+  applySubmit,
+  applyTimeout,
+  currentUid,
+  turnMsFor,
+  turnSeconds,
+  type BombRoom,
+} from './logic';
 
 const SYL = ['ar', 'es', 'ou'];
 
@@ -72,5 +82,114 @@ describe('applyTimeout', () => {
     expect(r.players.a.lives).toBe(0);
     expect(r.status).toBe('finished');
     expect(r.winnerUid).toBe('b');
+  });
+});
+
+describe('aceleração por acerto seguido', () => {
+  const started = (accel?: number) => {
+    const r = applyStart(lobby(['a', 'b']), SYL, 0, () => 0)!;
+    return accel === undefined ? r : { ...r, settings: { accel } };
+  };
+
+  it('sem configuração, o turno segue o tempo base', () => {
+    const r = { ...started(), players: { ...started().players, a: { ...started().players.a, streak: 5 } } };
+    expect(turnMsFor(r, 'a')).toBe(12000);
+  });
+
+  it('com aceleração leve, cada acerto seguido tira 1 s do próximo turno', () => {
+    const r = started(1);
+    r.players.a = { ...r.players.a, streak: 3 };
+    expect(turnMsFor(r, 'a')).toBe(9000);
+    expect(turnMsFor(r, 'b')).toBe(12000);
+  });
+
+  it('aceleração forte tira 2 s por acerto e nunca passa do mínimo de 3 s', () => {
+    const r = started(2);
+    r.players.a = { ...r.players.a, streak: 2 };
+    expect(turnMsFor(r, 'a')).toBe(8000);
+    r.players.a = { ...r.players.a, streak: 9 };
+    expect(turnMsFor(r, 'a')).toBe(3000);
+  });
+
+  it('acerto soma na sequência e o prazo do próximo jogador usa a sequência dele', () => {
+    const r0 = started(1);
+    r0.players.b = { ...r0.players.b, streak: 2 };
+    const r1 = applySubmit(r0, 'a', 'arara', true, 1000, SYL, () => 0)!;
+    expect(r1.players.a.streak).toBe(1);
+    expect(currentUid(r1)).toBe('b');
+    expect(r1.turnMs).toBe(10000);
+    expect(r1.deadline).toBe(1000 + 10000);
+  });
+
+  it('estourar o tempo zera a sequência de quem estava na vez', () => {
+    const r0 = started(1);
+    r0.players.a = { ...r0.players.a, streak: 4 };
+    const t = applyTimeout(r0, 12000, SYL, () => 0)!;
+    expect(t.players.a.streak).toBe(0);
+  });
+
+  it('início da partida zera as sequências', () => {
+    const lobbyRoom = lobby(['a', 'b']);
+    lobbyRoom.players.a.streak = 7;
+    expect(applyStart(lobbyRoom, SYL, 0, () => 0)!.players.a.streak).toBe(0);
+  });
+});
+
+describe('applySettings', () => {
+  const room = (): BombRoom => ({ ...lobby(['a', 'b']), status: 'lobby' });
+
+  it('só o host configura, e só com valor permitido', () => {
+    expect(applySettings(room(), 'b', 1)).toBeNull();
+    expect(applySettings(room(), 'a', 5)).toBeNull();
+    expect(applySettings(room(), 'a', 2)!.settings).toEqual({ accel: 2 });
+  });
+
+  it('não muda durante a partida', () => {
+    const playing = applyStart(room(), SYL, 0, () => 0)!;
+    expect(applySettings(playing, 'a', 1)).toBeNull();
+  });
+
+  it('é permitido depois da partida, para o próximo jogo', () => {
+    const finished: BombRoom = { ...room(), status: 'finished' };
+    expect(applySettings(finished, 'a', 1)!.settings).toEqual({ accel: 1 });
+  });
+});
+
+describe('digitação', () => {
+  it('é apagada quando a vez passa', () => {
+    const r0 = { ...applyStart(lobby(['a', 'b']), SYL, 0, () => 0)!, typing: { uid: 'a', text: 'ara', turn: 0 } };
+    const r1 = applySubmit(r0, 'a', 'arara', true, 1000, SYL, () => 0)!;
+    expect(r1.typing).toBeUndefined();
+  });
+});
+
+describe('attemptProblem', () => {
+  const room = { ...applyStart(lobby(['a', 'b']), SYL, 0, () => 0)!, used: { arara: true } };
+
+  it('explica o motivo da recusa na ordem: sílaba, dicionário, repetida', () => {
+    expect(attemptProblem(room, 'bola', true)).toContain('AR');
+    expect(attemptProblem(room, 'arzzz', false)).toContain('dicionário');
+    expect(attemptProblem(room, 'arara', true)).toContain('já foi usada');
+  });
+
+  it('aceita quando a palavra serve', () => {
+    expect(attemptProblem(room, 'arvore', true)).toBeNull();
+  });
+});
+
+describe('sílaba ao trocar a vez', () => {
+  const start = () => applyStart(lobby(['a', 'b']), SYL, 0, () => 0)!;
+
+  it('tempo estourado manda a mesma sílaba para o próximo jogador', () => {
+    const r0 = start();
+    const t = applyTimeout(r0, 12000, SYL, () => 0.99)!;
+    expect(currentUid(t)).toBe('b');
+    expect(t.syllable).toBe(r0.syllable);
+  });
+
+  it('acerto sorteia sílaba nova', () => {
+    const r0 = start();
+    const r = applySubmit(r0, 'a', 'arara', true, 1000, SYL, () => 0.99)!;
+    expect(r.syllable).toBe('ou');
   });
 });

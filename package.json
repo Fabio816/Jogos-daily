@@ -8,7 +8,10 @@
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "fetch:tmdb": "node --env-file=.env --experimental-strip-types scripts/fetch-tmdb.mjs"
+    "fetch:tmdb": "node --env-file=.env --experimental-strip-types scripts/fetch-tmdb.mjs",
+    "fetch:textless": "node --env-file=.env scripts/fetch-textless-posters.mjs",
+    "fetch:clear-art": "node --env-file=.env scripts/fetch-clear-art.mjs",
+    "gen:text": "node --env-file=.env --experimental-strip-types scripts/gen-text-questions.mjs"
   },
   "dependencies": {
     "firebase": "^13.0.0",

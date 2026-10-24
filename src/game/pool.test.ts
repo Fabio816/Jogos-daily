@@ -5,9 +5,9 @@ import { filterQuestions, pickNext } from './pool';
 
 describe('filterQuestions', () => {
   it('filtra por tipo e dificuldade', () => {
-    const pool = filterQuestions(QUESTIONS, { types: ['game'], difficulties: ['mainstream'] });
+    const pool = filterQuestions(QUESTIONS, { types: ['game'], difficulties: ['easy'] });
     expect(pool.length).toBeGreaterThan(0);
-    expect(pool.every((q) => q.type === 'game' && q.difficulty === 'mainstream')).toBe(true);
+    expect(pool.every((q) => q.type === 'game' && q.difficulty === 'easy')).toBe(true);
   });
 
   it('retorna vazio quando nenhum filtro bate', () => {
@@ -16,7 +16,7 @@ describe('filterQuestions', () => {
 
   it('separa perguntas de obra e de ator pelo kind', () => {
     const all = [...QUESTIONS, ...ACTOR_QUESTIONS];
-    const base = { types: ['movie', 'series'] as const, difficulties: ['mainstream', 'hard'] as const };
+    const base = { types: ['movie', 'series'] as const, difficulties: ['easy', 'medium', 'hard'] as const };
     const actorsOnly = filterQuestions(all, { ...base, types: [...base.types], difficulties: [...base.difficulties], kinds: ['actor'] });
     const worksOnly = filterQuestions(all, { ...base, types: [...base.types], difficulties: [...base.difficulties], kinds: ['work'] });
     expect(actorsOnly.length).toBeGreaterThan(0);

@@ -24,6 +24,23 @@ const el = ref<HTMLElement | null>(null);
 let map: L.Map | null = null;
 let layer: L.LayerGroup | null = null;
 
+// Rótulos em inglês via MapTiler (o OSM padrão mostra o nome local, ex.: japonês).
+// Sem chave, cai no OSM. Tiles do MapTiler são 512 px, por isso tileSize/zoomOffset.
+const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY as string | undefined;
+const TILES = MAPTILER_KEY
+  ? {
+      url: `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`,
+      attribution: '© <a href="https://www.maptiler.com/copyright/">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      tileSize: 512,
+      zoomOffset: -1,
+    }
+  : {
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: '© OpenStreetMap',
+      tileSize: 256,
+      zoomOffset: 0,
+    };
+
 function render() {
   if (!map || !layer) return;
   layer.clearLayers();
@@ -49,9 +66,11 @@ function render() {
 
 onMounted(() => {
   map = L.map(el.value!, { minZoom: 2, worldCopyJump: true }).setView([20, 0], 2);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  L.tileLayer(TILES.url, {
     maxZoom: 18,
-    attribution: '© OpenStreetMap',
+    tileSize: TILES.tileSize,
+    zoomOffset: TILES.zoomOffset,
+    attribution: TILES.attribution,
   }).addTo(map);
   layer = L.layerGroup().addTo(map);
   map.on('click', (e: L.LeafletMouseEvent) => {

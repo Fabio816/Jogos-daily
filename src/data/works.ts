@@ -10,6 +10,8 @@ export interface WorkEntry {
   aliases: string[];
   year?: number;
   posterUrl: string;
+  /** Arte sem o título impresso, usada na capa nítida. */
+  clearImageUrl?: string;
   tmdbId?: number;
   igdbId?: number;
   anilistId?: number;

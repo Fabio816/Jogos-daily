@@ -123,7 +123,7 @@ function mutateRoom(code: string, rule: (room: RoomState) => RoomState | null) {
     if (raw === null) return null;
     const next = rule(normalizeRoom(raw));
     return next ? cleanForRtdb(next) : undefined;
-  });
+  }, { applyLocally: false });
 }
 
 export function startGame(code: string) {

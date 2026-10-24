@@ -1,17 +1,29 @@
-import { haversineKm, scoreFor, type Cell } from './geo';
+import {
+  haversineKm,
+  REGION_CHOICES,
+  scoreFor,
+  SPREADS,
+  type Cell,
+  type RegionChoice,
+  type Spread,
+} from './geo';
 
 export interface OndeSettings {
   rounds: number;
   seconds: number;
+  region: RegionChoice;
+  spread: Spread;
 }
 
-export const DEFAULT_ONDE_SETTINGS: OndeSettings = { rounds: 5, seconds: 90 };
+export const DEFAULT_ONDE_SETTINGS: OndeSettings = { rounds: 5, seconds: 90, region: 'mundo', spread: 'cidade' };
 export const REVEAL_SHOW_MS = 10_000;
 
 export interface OndePlayer {
   name: string;
   score: number;
   joinedAt: number;
+  /** Presença: false quando a conexão cai. */
+  connected?: boolean;
 }
 
 export interface OndeResult {
@@ -56,7 +68,9 @@ export interface Pick {
 export function clampSettings(s: Partial<OndeSettings>): OndeSettings {
   const rounds = Math.min(10, Math.max(1, Math.round(s.rounds ?? DEFAULT_ONDE_SETTINGS.rounds)));
   const seconds = Math.min(180, Math.max(30, Math.round(s.seconds ?? DEFAULT_ONDE_SETTINGS.seconds)));
-  return { rounds, seconds };
+  const region = REGION_CHOICES.includes(s.region as RegionChoice) ? (s.region as RegionChoice) : DEFAULT_ONDE_SETTINGS.region;
+  const spread = SPREADS.includes(s.spread as Spread) ? (s.spread as Spread) : DEFAULT_ONDE_SETTINGS.spread;
+  return { rounds, seconds, region, spread };
 }
 
 /** O Realtime Database omite mapas vazios. Esta função devolve a forma completa. */
@@ -64,7 +78,7 @@ export function clampSettings(s: Partial<OndeSettings>): OndeSettings {
 export function normalizeOndeRoom(raw: any): OndeRoom {
   const players: Record<string, OndePlayer> = {};
   for (const [uid, p] of Object.entries<any>(raw.players ?? {})) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    players[uid] = { name: p.name ?? '?', score: p.score ?? 0, joinedAt: p.joinedAt ?? 0 };
+    players[uid] = { name: p.name ?? '?', score: p.score ?? 0, joinedAt: p.joinedAt ?? 0, connected: p.connected !== false };
   }
   const r = raw.round;
   return {

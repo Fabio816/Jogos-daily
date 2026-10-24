@@ -38,6 +38,22 @@ export function evaluate(guess: string, target: string): Mark[] {
   return marks;
 }
 
+/**
+ * Apaga a letra da célula selecionada. Se ela já estiver vazia, apaga a célula
+ * anterior e recua o cursor. Não altera a lista quando não há nada para apagar.
+ */
+export function eraseAt(letters: readonly string[], cursor: number): { letters: string[]; cursor: number } {
+  const next = [...letters];
+  if (cursor >= 0 && cursor < WORD_LEN && next[cursor]) {
+    next[cursor] = '';
+    return { letters: next, cursor };
+  }
+  if (cursor <= 0) return { letters: next, cursor: 0 };
+  const prev = Math.min(cursor, WORD_LEN) - 1;
+  next[prev] = '';
+  return { letters: next, cursor: prev };
+}
+
 export function isValidGuess(word: string, dictionary: ReadonlySet<string>): boolean {
   return word.length === WORD_LEN && dictionary.has(word);
 }

@@ -1,5 +1,13 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, type User } from 'firebase/auth';
+import {
+  browserSessionPersistence,
+  getAuth,
+  initializeAuth,
+  onAuthStateChanged,
+  signInAnonymously,
+  type Auth,
+  type User,
+} from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
 
 const config = {
@@ -13,12 +21,34 @@ const config = {
 };
 
 export const app = initializeApp(config);
-export const auth = getAuth(app);
+
+/**
+ * Em desenvolvimento cada aba tem a própria sessão anônima, para testar salas
+ * com vários jogadores no mesmo navegador. Em produção a sessão continua salva
+ * no navegador (a mesma pessoa em qualquer aba).
+ */
+function createAuth(): Auth {
+  if (!import.meta.env.DEV) return getAuth(app);
+  try {
+    return initializeAuth(app, { persistence: browserSessionPersistence });
+  } catch {
+    // HMR: o Auth já foi inicializado nesta página.
+    return getAuth(app);
+  }
+}
+
+export const auth = createAuth();
 export const db = getDatabase(app);
 
-/** Entra anonimamente (sem conta) e devolve o usuário. Reutiliza a sessão se já existir. */
+let signingIn: Promise<User> | null = null;
+
+/**
+ * Entra anonimamente (sem conta) e devolve o usuário. Reutiliza a sessão se já existir.
+ * Chamadas simultâneas compartilham a mesma promessa: sem isso, cada uma podia criar um
+ * usuário anônimo novo, e o host de uma sala não batia com o uid da tela.
+ */
 export function ensureSignedIn(): Promise<User> {
-  return new Promise((resolve, reject) => {
+  signingIn ??= new Promise<User>((resolve, reject) => {
     const unsubscribe = onAuthStateChanged(
       auth,
       async (user) => {
@@ -33,5 +63,8 @@ export function ensureSignedIn(): Promise<User> {
       },
       reject,
     );
+  }).finally(() => {
+    signingIn = null;
   });
+  return signingIn;
 }

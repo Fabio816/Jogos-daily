@@ -18,6 +18,8 @@ export interface TermoPlayer {
   solved: boolean;
   /** Pontos acumulados na partida. */
   score: number;
+  /** Presença: false quando a conexão cai. */
+  connected?: boolean;
 }
 
 export interface TermoRound {
@@ -54,7 +56,7 @@ export function clampSettings(s: Partial<TermoSettings>): TermoSettings {
 export function normalizeTermoRoom(raw: any): TermoRoom {
   const players: Record<string, TermoPlayer> = {};
   for (const [uid, p] of Object.entries<any>(raw.players ?? {})) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    players[uid] = { name: p.name ?? '?', guesses: toArray(p.guesses), solved: !!p.solved, score: p.score ?? 0 };
+    players[uid] = { name: p.name ?? '?', guesses: toArray(p.guesses), solved: !!p.solved, score: p.score ?? 0, connected: p.connected !== false };
   }
   let round: TermoRound | null = null;
   if (raw.round) {

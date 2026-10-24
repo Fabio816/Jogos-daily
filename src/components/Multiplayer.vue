@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { Difficulty, Question, WorkType } from '../data/questions';
+import { DIFFICULTIES, DIFFICULTY_LABEL } from '../game/difficulty';
 import { GROUPS, GROUP_LABEL, type Group } from '../game/mix';
 import { ensureSignedIn } from '../firebase';
 import CountdownRing from './CountdownRing.vue';
 import SettingsDialog from './SettingsDialog.vue';
 import RoomChat from './RoomChat.vue';
+import RoomInvite from './RoomInvite.vue';
+import RoomPlayers from './RoomPlayers.vue';
+import RoomAlerts from './RoomAlerts.vue';
+import { useDevtoolsAlerts } from '../lib/alerts';
+import { clearInviteFromUrl, inviteCodeFromUrl } from '../lib/invite';
 import { ALL_QUESTIONS, DEFAULT_SETTINGS, type RoomSettings } from '../game/catalog';
 import { isCorrectGuess } from '../game/answer';
 import { blurPx } from '../game/reveal';
@@ -25,13 +31,13 @@ import {
 import { isAdvanceDue, type RoomState } from '../multiplayer/state';
 
 const TYPE_LABEL: Record<WorkType, string> = { movie: 'Filme', series: 'Série', game: 'Jogo', anime: 'Anime' };
-const DIFF_LABEL: Record<Difficulty, string> = { mainstream: 'Mainstream', hard: 'Difícil' };
 
 const name = ref(localStorage.getItem('qeo:name') ?? '');
-const joinCode = ref(new URLSearchParams(window.location.search).get('sala') ?? '');
+const joinCode = ref(inviteCodeFromUrl());
 const code = ref('');
 const uid = ref('');
 const room = ref<RoomState | null>(null);
+const alerts = useDevtoolsAlerts('qual-e-a-obra', code, name, computed(() => room.value?.status === 'playing'));
 const error = ref('');
 const busy = ref(false);
 const now = ref(serverNow());
@@ -56,6 +62,11 @@ const timer = setInterval(() => {
       });
   }
 }, 250);
+
+// Link com ?sala=CODIGO: entra direto na sala (pede o nome se ainda não houver).
+onMounted(() => {
+  if (joinCode.value) void join();
+});
 
 onBeforeUnmount(() => {
   clearInterval(timer);
@@ -86,16 +97,29 @@ const secondsLeft = computed(() => {
 const roundSeconds = computed(() => (round.value ? Math.round(round.value.durationMs / 1000) : 0));
 
 /** Capa da rodada: obras (desfocada ou nítida) e também ator/personagem, que mostram a capa da obra. */
-const posterUrl = computed(() => question.value?.imageUrl);
+const poster = computed(() => {
+  const q = question.value;
+  const r = round.value;
+  if (!q?.imageUrl || q.clueType === 'emoji' || q.clueType === 'phrase') return undefined;
+  const clearCover = q.clueType === 'image' && r?.blur === false && r.status === 'clue';
+  return {
+    url: clearCover && q.clearImageUrl ? q.clearImageUrl : q.imageUrl,
+    hideTitle: clearCover && !q.clearImageUrl,
+  };
+});
 
 const mixTotal = computed(() =>
   room.value ? GROUPS.reduce((sum, g) => sum + (room.value!.settings.mix[g] ?? 0), 0) : 0,
+);
+const difficultyTotal = computed(() =>
+  room.value ? DIFFICULTIES.reduce((sum, d) => sum + (room.value!.settings.difficultyMix[d] ?? 0), 0) : 0,
 );
 
 const posterBlur = computed(() => {
   const r = round.value;
   return r && r.status === 'clue' && r.blur ? blurPx(progress.value) : 0;
 });
+const posterStyle = computed(() => (posterBlur.value > 0 ? { filter: `blur(${posterBlur.value}px)` } : undefined));
 
 const players = computed(() =>
   Object.entries(room.value?.players ?? {})
@@ -136,6 +160,7 @@ async function run(task: () => Promise<unknown>) {
 function enter(roomCode: string) {
   localStorage.setItem('qeo:name', name.value.trim());
   code.value = roomCode;
+  clearInviteFromUrl();
   unsubRoom?.();
   unsubRoom = subscribeRoom(roomCode, (r) => {
     room.value = r;
@@ -180,6 +205,12 @@ function onMix(group: Group, event: Event) {
   patch({ mix: { ...room.value.settings.mix, [group]: value } });
 }
 
+function onDifficulty(difficulty: Difficulty, event: Event) {
+  if (!room.value) return;
+  const value = Math.max(0, Number((event.target as HTMLInputElement).value) || 0);
+  patch({ difficultyMix: { ...room.value.settings.difficultyMix, [difficulty]: value } });
+}
+
 async function patch(changes: Partial<RoomSettings>) {
   if (!isHost.value || !room.value) return;
   await run(() => updateSettings(code.value, { ...room.value!.settings, ...changes }));
@@ -216,7 +247,7 @@ async function submitGuess() {
 
   const text = guess.value.trim();
   if (!text) return;
-  if (!isCorrectGuess(text, q.answers)) {
+  if (!isCorrectGuess(text, q.answers, { titleAliases: !q.kind || q.kind === 'work' })) {
     feedback.value = 'Não é essa. Tente de novo.';
     guess.value = '';
     await sendMessage(code.value, uid.value, name.value.trim(), text, 'guess');
@@ -235,7 +266,6 @@ async function submitGuess() {
 
 
 
-const inviteLink = computed(() => `${window.location.origin}${window.location.pathname}?sala=${code.value}`);
 </script>
 
 <template>
@@ -270,17 +300,10 @@ const inviteLink = computed(() => `${window.location.origin}${window.location.pa
       <div class="code">
         <span class="muted">Código da sala</span>
         <strong>{{ code }}</strong>
-        <span class="muted small">Compartilhe: {{ inviteLink }}</span>
       </div>
 
-      <h3>Jogadores ({{ players.length }})</h3>
-      <ul class="players">
-        <li v-for="p in players" :key="p.id">
-          {{ p.name }}
-          <span v-if="p.id === room.hostUid" class="tag">host</span>
-          <span v-if="p.id === uid" class="tag you">você</span>
-        </li>
-      </ul>
+      <RoomInvite :code="code" path="/qual-e-a-obra" />
+      <RoomPlayers :players="players" :host-uid="room.hostUid" :my-uid="uid" />
 
       <template v-if="isHost">
         <SettingsDialog title="Configurações da partida" :summary="`${room.settings.targetPoints} pts · ${room.settings.durationSec}s por pista`">
@@ -302,10 +325,11 @@ const inviteLink = computed(() => `${window.location.origin}${window.location.pa
           </div>
 
           <div class="group">
-            <span class="muted">Dificuldade</span>
-            <label v-for="(label, key) in DIFF_LABEL" :key="key" class="check">
-              <input type="checkbox" :checked="room.settings.difficulties.includes(key)" @change="patch({ difficulties: toggleList(room.settings.difficulties, key) })" />
-              {{ label }}
+            <span class="muted">Dificuldade (peso em %; o total é {{ difficultyTotal }})</span>
+            <label v-for="d in DIFFICULTIES" :key="d" class="pct">
+              <span>{{ DIFFICULTY_LABEL[d] }}</span>
+              <input type="number" min="0" max="100" step="5" :value="room.settings.difficultyMix[d]" @change="onDifficulty(d, $event)" />
+              <span class="muted">%</span>
             </label>
           </div>
 
@@ -347,8 +371,8 @@ const inviteLink = computed(() => `${window.location.origin}${window.location.pa
         <div class="main">
           <div v-if="!question" class="clue muted">Preparando a rodada…</div>
 
-          <div v-else class="clue">
-            <img v-if="posterUrl" class="poster" :src="posterUrl" alt="Capa" :style="{ filter: `blur(${posterBlur}px)` }" />
+          <div v-else :key="question.id" class="clue">
+            <img v-if="poster" class="poster" :class="{ 'title-hidden': poster.hideTitle }" :src="poster.url" alt="Capa" :style="posterStyle" />
             <span v-if="question.clueType === 'emoji'" class="emoji">{{ question.clue }}</span>
             <p v-else-if="question.clueType === 'character'" class="character">
               Quem interpreta <strong>{{ question.clue }}</strong> em <strong>{{ question.workTitle }}</strong>?
@@ -386,7 +410,7 @@ const inviteLink = computed(() => `${window.location.origin}${window.location.pa
         </div>
 
         <aside class="board">
-          <h4>Placar</h4>
+          <h4>Jogadores ({{ players.length }})</h4>
           <ol>
             <li v-for="p in players" :key="p.id" :class="{ offline: !p.connected }">
               <span>{{ p.name }}</span>
@@ -411,6 +435,7 @@ const inviteLink = computed(() => `${window.location.origin}${window.location.pa
       <button class="ghost" @click="leave">Sair da sala</button>
     </div>
 
+    <RoomAlerts :alerts="alerts" />
     <RoomChat v-if="code && room" :messages="messages" :my-uid="uid" @send="sendChat" />
   </section>
 </template>
