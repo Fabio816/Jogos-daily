@@ -8,6 +8,25 @@ export interface ChangelogEntry {
 /** Mais recente primeiro. Ao lançar uma versão, adicione uma entrada aqui (ver AGENTS.md). */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'Claudio Games 1.1',
+    date: '2026-10-26',
+    sections: [
+      {
+        title: 'Bombsquads (prévia)',
+        items: [
+          'Ranking ao fim da partida: classificação por pontos (rodadas vencidas), quem está pronto e o vencedor em destaque.',
+          'Jogar de novo com as mesmas configurações, ou ajustar as configurações antes. Cada jogador marca que está pronto e o anfitrião inicia.',
+          'Avisos de "Preparar!", "Vitória da rodada" e fechamento maiores, com animação.',
+          'Recarregar a página no meio da partida volta para a partida, em vez de cair na tela de entrada.',
+          'Correção: os jogadores passam a andar e colocar bombas (o controle local estava desligado).',
+          'Correção: o fogo das explosões volta a aparecer e a tela não trava mais depois de uma explosão.',
+          'Correção: os itens das caixas aparecem com ícone.',
+          'Correção: placar e botão Sair deixam de se sobrepor ao contador de rodada.',
+        ],
+      },
+    ],
+  },
+  {
     version: 'Claudio Games 1.0',
     date: '2026-10-24',
     sections: [

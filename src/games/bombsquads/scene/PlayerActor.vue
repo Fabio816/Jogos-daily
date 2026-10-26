@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { shallowRef } from 'vue'
 import { useLoop } from '@tresjs/core'
 import * as THREE from 'three'
 import { PALETTE, cellToWorld, facingRotation, toonGradient } from '../visual'
@@ -18,10 +18,10 @@ const props = defineProps<{
 
 const gradient = toonGradient
 
-const group = ref<THREE.Group>()
-const inner = ref<THREE.Group>()
-const antenna = ref<THREE.Group>()
-const shield = ref<THREE.Mesh>()
+const group = shallowRef<THREE.Group>()
+const inner = shallowRef<THREE.Group>()
+const antenna = shallowRef<THREE.Group>()
+const shield = shallowRef<THREE.Mesh>()
 
 let motion = 0
 let lastX: number | null = null

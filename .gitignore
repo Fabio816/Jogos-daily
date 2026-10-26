@@ -16,6 +16,7 @@ dist-ssr
 !.env.example
 .firebase
 .wrangler
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*

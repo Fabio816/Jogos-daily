@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue'
+import { TresCanvas } from '@tresjs/core'
 import * as THREE from 'three'
 import { accentFor } from '../visual'
 import { DROP_LIFETIME_MS, type DropView, type MatchClient } from '../match-client'
@@ -12,8 +13,9 @@ import BlastActor from './BlastActor.vue'
 import ItemActor from './ItemActor.vue'
 import FallingBlock from './FallingBlock.vue'
 import PlayerActor from './PlayerActor.vue'
+import MatchClock from './MatchClock.vue'
 
-const props = defineProps<{ client: MatchClient; snapshot: Snapshot | null }>()
+const props = defineProps<{ client: MatchClient; snapshot: Snapshot | null; keys: ReadonlySet<string> }>()
 
 const arenaObject = shallowRef<THREE.Group | null>(null)
 
@@ -94,12 +96,13 @@ const actors = computed<PlayerView[]>(() => {
 
 <template>
   <TresCanvas clear-color="#070b16" shadows :dpr="[1, 1.5]">
+    <MatchClock :client="props.client" :keys="props.keys" />
     <Suspense>
       <CameraRig :span="span" />
     </Suspense>
     <SceneLights />
     <Suspense>
-      <TresPrimitive v-if="arenaObject" :object="arenaObject" />
+      <primitive v-if="arenaObject" :object="arenaObject" />
     </Suspense>
 
     <template v-for="view in bombs" :key="view.key">

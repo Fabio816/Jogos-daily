@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue'
+import { shallowRef, onUnmounted } from 'vue'
 import * as THREE from 'three'
 import { useLoop } from '@tresjs/core'
 import { PALETTE, cellToWorld, toonGradient } from '../visual'
@@ -11,7 +11,7 @@ const START_HEIGHT = 7
 
 const props = defineProps<{ drop: DropView; map: { w: number; h: number } }>()
 
-const group = ref<THREE.Group>()
+const group = shallowRef<THREE.Group>()
 const [wx, , wz] = cellToWorld(props.map, props.drop.x, props.drop.y)
 
 const { onBeforeRender } = useLoop()

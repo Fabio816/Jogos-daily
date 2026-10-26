@@ -12,17 +12,15 @@ const BASE = [11, 15, 13] as const
 const props = defineProps<{ span: number }>()
 
 const { camera } = useTresContext()
-const activeCamera = camera.activeCamera
 
 watch(
-  () => props.span,
-  () => {
-    const cam = activeCamera.value
-    if (!cam) return
+  () => [camera.activeCamera.value, props.span] as const,
+  ([active]) => {
+    if (!active) return
     const distance = Math.max(1, props.span / REFERENCE_SPAN)
-    cam.position.set(BASE[0] * distance, BASE[1] * distance, BASE[2] * distance)
-    cam.lookAt(0, 0.2, 0)
-    if ('updateProjectionMatrix' in cam) cam.updateProjectionMatrix()
+    active.position.set(BASE[0] * distance, BASE[1] * distance, BASE[2] * distance)
+    active.lookAt(0, 0.2, 0)
+    if ('updateProjectionMatrix' in active) active.updateProjectionMatrix()
   },
   { immediate: true },
 )

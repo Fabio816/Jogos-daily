@@ -33,6 +33,17 @@ const banner = computed(() => {
   return null
 })
 
+const bannerSub = computed(() => {
+  if (props.snapshot.phase === 'countdown') return props.snapshot.round > 0 ? `Rodada ${props.snapshot.round}` : null
+  if (props.snapshot.phase === 'roundEnd') return 'Próxima rodada em instantes'
+  return null
+})
+const bannerTone = computed(() => {
+  if (props.snapshot.sudden) return 'tone-danger'
+  if (props.snapshot.phase === 'roundEnd') return 'tone-win'
+  return 'tone-go'
+})
+
 const eliminated = computed(() => me.value !== null && !me.value.alive && props.snapshot.phase === 'playing')
 
 const scores = computed(() => {
@@ -61,7 +72,10 @@ const statusLabel = computed(() =>
       <button class="hud-btn" type="button" @click="emit('leave')">Sair</button>
     </div>
 
-    <div class="hud-banner" v-if="banner">{{ banner }}</div>
+    <div class="hud-banner" :class="bannerTone" v-if="banner" :key="banner">
+      <span class="hud-banner-main">{{ banner }}</span>
+      <span class="hud-banner-sub" v-if="bannerSub">{{ bannerSub }}</span>
+    </div>
     <div class="hud-eliminated" v-if="eliminated">Eliminado — assistindo a rodada</div>
     <div class="hud-reconnect" v-if="statusLabel">{{ statusLabel }}</div>
 
@@ -104,7 +118,7 @@ const statusLabel = computed(() =>
   position: absolute;
   top: 12px;
   left: 12px;
-  right: 12px;
+  right: 76px;
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -122,14 +136,54 @@ const statusLabel = computed(() =>
 .hud-box.sudden { color: #ff5d2e; }
 .hud-banner {
   position: absolute;
-  top: 32%;
+  top: 34%;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 34px;
-  font-weight: 800;
-  color: #ff5d2e;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(92vw, 880px);
+  text-align: center;
   pointer-events: none;
+  animation: bannerPop 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.hud-banner-main {
+  font-size: clamp(34px, 7vw, 84px);
+  font-weight: 900;
+  line-height: 1.05;
+  overflow-wrap: break-word;
+  letter-spacing: 0.02em;
+  background: linear-gradient(180deg, #fff3b0 0%, #ffb703 45%, #ff5d2e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 4px 18px rgba(255, 93, 46, 0.45)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+}
+.hud-banner-sub {
+  font-size: clamp(15px, 2.4vw, 22px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e6f2ff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgba(10, 14, 26, 0.55);
+}
+.hud-banner.tone-win .hud-banner-main {
+  background: linear-gradient(180deg, #d9ffe9 0%, #2ec4b6 60%, #4cc9f0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.hud-banner.tone-danger .hud-banner-main {
+  background: linear-gradient(180deg, #ffd6c7 0%, #ff5d2e 55%, #d00000 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+@keyframes bannerPop {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.5); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1); }
 }
 .hud-eliminated {
   position: absolute;
@@ -149,7 +203,7 @@ const statusLabel = computed(() =>
 }
 .hud-scores {
   position: absolute;
-  top: 12px;
+  top: 68px;
   left: 14px;
   background: rgba(10, 14, 26, 0.55);
   border-radius: 12px;

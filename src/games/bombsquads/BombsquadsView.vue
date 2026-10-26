@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, shallowRef, ref, watch } from 'vu
 import { useRoute } from 'vue-router'
 import MatchScene from './scene/MatchScene.vue'
 import LobbyView from './scene/LobbyView.vue'
+import RankingPanel from './scene/RankingPanel.vue'
 import HudView from './scene/HudView.vue'
 import { Connection, type ConnectionStatus } from './connection'
 import { createRoomCode, roomUrl, WS_BASE } from './config'
@@ -41,6 +42,10 @@ const snapshot = shallowRef<Snapshot | null>(null)
 const match = shallowRef<MatchClient | null>(null)
 const connection = shallowRef<Connection | null>(null)
 
+/** Resultado da última partida (sobre o lobby). Null quando fechado ou em partida. */
+type RankingRow = { id: string; name: string; score: number }
+const ranking = shallowRef<{ winnerId: string | null; rows: RankingRow[] } | null>(null)
+
 const myId = computed(() => session.value?.playerId ?? '')
 const playing = computed(() => lobby.value?.status === 'playing' && snapshot.value !== null)
 
@@ -60,7 +65,7 @@ function helloMessage(): ClientMessage {
 
 function onMessage(raw: ServerMessage): void {
   const message = raw as { t: string } & typeof raw
-  debugMessage('<', message)
+  debugMessage('<', message.t ?? '?')
   if (message.t === 'welcome') {
     const data = message as unknown as { playerId: string; token: string; code: string }
     const next: Session = { code: data.code, playerId: data.playerId, token: data.token, name: name.value.trim() || 'Jogador' }
@@ -71,12 +76,26 @@ function onMessage(raw: ServerMessage): void {
     errorMessage.value = null
   } else if (message.t === 'lobby') {
     lobby.value = raw as LobbyMessage
+    if ((raw as LobbyMessage).status === 'playing') ranking.value = null
+    /** Ganchos de dev para o teste automatizado (CDP lê a posição prevista). */
+    if (import.meta.env.DEV && match.value) {
+      (window as unknown as { __bsClient?: MatchClient | null }).__bsClient = match.value
+    }
+    if (import.meta.env.DEV) (window as unknown as { __bsLastLobby?: unknown }).__bsLastLobby = raw
   } else if (message.t === 'snapshot') {
     const data = (message as unknown as { snapshot: Snapshot }).snapshot
     match.value?.onSnapshot(data, performance.now())
     snapshot.value = data
   } else if (message.t === 'matchEnd') {
-    // O fim da partida vira o próximo `lobby` com status 'lobby'.
+    // Chega antes do `lobby` com status 'lobby' (que traz as prontidões zeradas).
+    const data = raw as Extract<ServerMessage, { t: 'matchEnd' }>
+    const names = new Map<string, string>()
+    for (const player of snapshot.value?.players ?? []) names.set(player.id, player.name)
+    for (const player of lobby.value?.players ?? []) names.set(player.id, player.name)
+    const rows = Object.entries(data.scores)
+      .map(([id, score]) => ({ id, score, name: names.get(id) ?? 'Jogador' }))
+      .sort((a, b) => b.score - a.score)
+    ranking.value = { winnerId: data.winnerId, rows }
   } else if (message.t === 'error') {
     const code = (message as unknown as { code: string }).code
     errorMessage.value = ERROR_TEXT[code] ?? `Erro do servidor: ${code}`
@@ -149,6 +168,10 @@ function resetLocalState(): void {
   snapshot.value = null
   match.value = null
   session.value = null
+  ranking.value = null
+  if (import.meta.env.DEV) {
+    (window as unknown as { __bsClient?: MatchClient | null }).__bsClient = null
+  }
 }
 
 watch(
@@ -190,6 +213,36 @@ onBeforeUnmount(() => {
 const code = computed(() => lobby.value?.code ?? codeInput.value)
 const hostId = computed(() => lobby.value?.hostId ?? null)
 const isHost = computed(() => hostId.value === myId.value)
+const myPlayer = computed(() => lobby.value?.players.find((player) => player.id === myId.value) ?? null)
+const canStart = computed(
+  () =>
+    !!lobby.value &&
+    isHost.value &&
+    lobby.value.status === 'lobby' &&
+    lobby.value.players.length >= lobby.value.minPlayers &&
+    lobby.value.players.every((player) => player.ready),
+)
+const rankingStartHint = computed(() => {
+  if (canStart.value) return null
+  if (isHost.value) return 'Quando todos clicarem em "Jogar de novo", você pode começar.'
+  return 'Aguardando o anfitrião começar a nova partida.'
+})
+/** Prontidão e conexão vêm do lobby atual; nomes e pontos ficam fixos no resultado. */
+const rankingView = computed(() => {
+  if (!ranking.value) return null
+  const byId = new Map((lobby.value?.players ?? []).map((player) => [player.id, player]))
+  return ranking.value.rows.map((row) => ({
+    ...row,
+    ready: byId.get(row.id)?.ready ?? false,
+    connected: byId.get(row.id)?.connected ?? false,
+    mine: row.id === myId.value,
+  }))
+})
+const rankingWinnerName = computed(() => {
+  const winnerId = ranking.value?.winnerId
+  if (!winnerId) return null
+  return ranking.value?.rows.find((row) => row.id === winnerId)?.name ?? null
+})
 const statusTextForLobby = computed(() => {
   if (status.value === 'connecting') return 'Conectando...'
   if (status.value === 'reconnecting') return 'Reconectando...'
@@ -213,18 +266,45 @@ watch(status, (value) => {
 })
 
 onMounted(() => {
+  // Recarregar a aba (ou o HMR do dev) não pode jogar o jogador para o formulário:
+  // se há sessão salva para esta sala, reentra com o mesmo jogador e token.
+  if (import.meta.env.DEV) (window as unknown as { __bsInject?: (m: ServerMessage) => void }).__bsInject = onMessage
+  const saved = loadSession()
+  const invited = typeof route.query.sala === 'string' ? route.query.sala.toUpperCase() : ''
+  const isDevAuto = import.meta.env.DEV && route.query.auto === '1'
+  if (saved && !isDevAuto && (!invited || invited === saved.code)) {
+    setTimeout(() => {
+      if (lobby.value === null && !busy.value) join(saved.code)
+    }, 0)
+  }
   waitingTimer = setInterval(() => {
     const trying = status.value === 'connecting' || status.value === 'reconnecting'
     waiting.value = trying && lobby.value === null && Date.now() - startedAt.value > ELAPSED
   }, 1000)
-  // Ajuda de dev: ?auto=1 cria a sala sozinho (usado pelo navegador de teste headless).
+  // Ajuda de dev: ?auto=1 entra/cria sozinho e ?autoready=1 prepara e inicia (navegador de teste).
   if (import.meta.env.DEV && route.query.auto === '1') {
     debugMessage('montou', 'auto=1')
-    setTimeout(() => { if (lobby.value === null && !busy.value) void createRoom() }, 400)
+    const sala = typeof route.query.sala === 'string' ? route.query.sala.toUpperCase() : ''
+    setTimeout(() => {
+      if (lobby.value !== null || busy.value) return
+      if (sala) join(sala)
+      else void createRoom()
+    }, 400)
   }
 })
 onBeforeUnmount(() => {
   if (waitingTimer) clearInterval(waitingTimer)
+})
+
+watch(lobby, (l) => {
+  if (!import.meta.env.DEV || route.query.autoready !== '1' || !l || l.status !== 'lobby') return
+  const me = l.players.find((p) => p.id === myId.value)
+  if (me && !me.ready) connection.value?.send({ t: 'ready', ready: true })
+  const others = l.players.filter((p) => p.id !== myId.value)
+  if (isHost.value && others.length > 0 && others.every((p) => p.ready)) {
+    debugMessage('auto-start', l.players.length)
+    connection.value?.send({ t: 'start' })
+  }
 })
 
 const serverLabel = computed(() => new URL(WS_BASE.replace(/^ws/, 'http')).host)
@@ -232,11 +312,18 @@ const serverLabel = computed(() => new URL(WS_BASE.replace(/^ws/, 'http')).host)
 /** Diagnóstico no console durante o dev (e um rastro pequeno na tela). */
 const trace = ref<string[]>([])
 const isDevTrace = import.meta.env.DEV
+/** snapshot 15 Hz e lobby encharcariam o console; logue só a cada 2 s. */
+const LAST_LOG_MS: Record<string, number> = {}
 function debugMessage(label: string, payload: unknown): void {
   if (!import.meta.env.DEV) return
-  const now = new Date()
-  const stamp = `${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
+  const now = performance.now()
   const kind = typeof payload === 'string' ? payload : (payload as { t?: string } | null)?.t ?? ''
+  if (kind === 'snapshot' || kind === 'lobby') {
+    const last = LAST_LOG_MS[kind] ?? -Infinity
+    if (now - last < 2000) return
+    LAST_LOG_MS[kind] = now
+  }
+  const stamp = new Date().toTimeString().slice(3, 8)
   trace.value.push(`${stamp} ${label} ${kind}`)
   if (trace.value.length > 12) trace.value.splice(0, trace.value.length - 12)
   console.debug('[bombsquads]', label, payload)
@@ -245,7 +332,45 @@ function debugMessage(label: string, payload: unknown): void {
 
 <template>
   <main class="app bombsquads-page" :class="{ inmatch: playing }">
-    <section v-if="lobby === null" class="window bs-entry">
+    <template v-if="playing && match && snapshot">
+      <div class="bs-stage">
+        <MatchScene :client="match" :snapshot="snapshot" :keys="held" />
+      </div>
+      <HudView :snapshot="snapshot" :my-id="myId" :status="status" @leave="leave" />
+    </template>
+
+    <template v-else-if="lobby">
+    <LobbyView
+      :code="code"
+      :host-id="hostId"
+      :players="lobby.players"
+      :my-id="myId"
+      :is-host="isHost"
+      :settings="lobby.settings"
+      :min-players="lobby.minPlayers"
+      :max-players="lobby.maxPlayers"
+      :status="lobby.status"
+      :status-text="statusTextForLobby"
+      @ready="readyToggle"
+      @start="sendStart"
+      @settings="sendSettings"
+      @leave="leave"
+    />
+    <RankingPanel
+      v-if="rankingView"
+      :rows="rankingView"
+      :winner-name="rankingWinnerName"
+      :is-host="isHost"
+      :can-start="canStart"
+      :my-ready="myPlayer?.ready ?? false"
+      :start-hint="rankingStartHint"
+      @again="readyToggle(!myPlayer?.ready)"
+      @start="sendStart"
+      @settings="ranking = null"
+    />
+    </template>
+
+    <section v-else class="window bs-entry">
       <div class="panel">
         <h2>Bombsquads</h2>
         <label class="bs-field">
@@ -269,29 +394,6 @@ function debugMessage(label: string, payload: unknown): void {
         <p v-if="isDevTrace" class="bs-trace">{{ trace.join(' | ') }}</p>
       </div>
     </section>
-
-    <LobbyView
-      v-else
-      :code="code"
-      :host-id="hostId"
-      :players="lobby.players"
-      :my-id="myId"
-      :is-host="isHost"
-      :settings="lobby.settings"
-      :min-players="lobby.minPlayers"
-      :max-players="lobby.maxPlayers"
-      :status="lobby.status"
-      :status-text="statusTextForLobby"
-      @ready="readyToggle"
-      @start="sendStart"
-      @settings="sendSettings"
-      @leave="leave"
-    />
-
-    <template v-if="playing && match && snapshot">
-      <MatchScene :client="match" :snapshot="snapshot" />
-      <HudView :snapshot="snapshot" :my-id="myId" :status="status" @leave="leave" />
-    </template>
   </main>
 </template>
 
@@ -303,6 +405,13 @@ function debugMessage(label: string, payload: unknown): void {
   background: #070b16;
   overflow: hidden;
 }
+.bs-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: #070b16;
+}
+.bs-stage > * { width: 100%; height: 100%; }
 .bs-entry { max-width: 380px; margin: 24px auto; }
 .bs-field { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; }
 .bs-field span { font-size: 12px; opacity: 0.8; }

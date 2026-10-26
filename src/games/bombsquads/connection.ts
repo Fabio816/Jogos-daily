@@ -66,6 +66,7 @@ export class Connection {
     }
 
     socket.onclose = (event) => {
+      if (import.meta.env.DEV) console.debug('[bombsquads] close', event.code, event.reason || '-', 'stopped=', this.stopped)
       if (this.stopped) {
         this.options.onStatus('closed')
         return

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { shallowRef, onMounted } from 'vue'
 import type { DirectionalLight } from 'three'
 
 /** Luzes do protótipo: ambiente fria + sol quente com sombra + rim lights. */
-const sun = ref<DirectionalLight>()
+const sun = shallowRef<DirectionalLight>()
 
 onMounted(() => {
   const light = sun.value

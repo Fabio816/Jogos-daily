@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, shallowRef } from 'vue'
 import { useLoop, useTresContext } from '@tresjs/core'
 import * as THREE from 'three'
 import { iconDataUrl, ITEM_INFO } from '../icons'
@@ -11,11 +11,25 @@ import type { ItemType } from '../sim'
  */
 const props = defineProps<{ x: number; z: number; y: number; type: string }>()
 
-const holder = ref<THREE.Group>()
-const sprite = ref<THREE.Mesh>()
+const holder = shallowRef<THREE.Group>()
+const sprite = shallowRef<THREE.Mesh>()
 
 const color = ITEM_INFO[props.type as ItemType]?.color ?? '#ffffff'
-const texture = new THREE.TextureLoader().load(iconDataUrl(props.type as ItemType))
+
+/*
+ * Textura em canvas de tamanho fixo: o SVG só é desenhado depois de carregar.
+ * Passar a <img> crua ao WebGL antes do load gera "bad image data" e textura imutável.
+ */
+const iconCanvas = document.createElement('canvas')
+iconCanvas.width = 128
+iconCanvas.height = 128
+const texture = new THREE.CanvasTexture(iconCanvas)
+const icon = new Image()
+icon.onload = () => {
+  iconCanvas.getContext('2d')?.drawImage(icon, 0, 0, iconCanvas.width, iconCanvas.height)
+  texture.needsUpdate = true
+}
+icon.src = iconDataUrl(props.type as ItemType)
 
 const { onBeforeRender } = useLoop()
 const { camera } = useTresContext()
@@ -40,7 +54,10 @@ onBeforeRender(({ delta }) => {
 // Billboard estático: como a câmera é fixa, uma cópia do quaternion dela já resolve.
 if (sprite.value && activeCamera.value) sprite.value.quaternion.copy(activeCamera.value.quaternion)
 
-onBeforeUnmount(() => texture.dispose())
+onBeforeUnmount(() => {
+  icon.onload = null
+  texture.dispose()
+})
 </script>
 
 <template>

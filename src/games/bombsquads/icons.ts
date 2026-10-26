@@ -9,7 +9,7 @@ import type { ItemType } from './sim'
 const GLYPH = '#0b1524'
 
 function disk(color: string, glyph: string): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22.5" fill="${color}" stroke="#ffffff" stroke-width="2"/>${glyph}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22.5" fill="${color}" stroke="#ffffff" stroke-width="2"/>${glyph}</svg>`
 }
 
 export type ItemInfo = {

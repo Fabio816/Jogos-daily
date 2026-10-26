@@ -184,6 +184,9 @@ export class Room extends DurableObject<Env> {
     setPlayerPresence(this.lobby, playerId, true)
     ws.serializeAttachment({ playerId } satisfies Attachment)
     this.send(ws, { t: 'welcome', playerId, token, code: this.lobby.code })
+    // Sempre manda o lobby: é ele que diz ao cliente que a partida está 'playing'.
+    // Sem ele, quem recarrega no meio da partida cai no formulário de entrada.
+    this.send(ws, this.lobbyMessage())
 
     if (this.match) {
       setPlayerConnected(this.match, playerId, true)
@@ -321,7 +324,11 @@ export class Room extends DurableObject<Env> {
   }
 
   private broadcastLobby(): void {
-    this.broadcast({
+    this.broadcast(this.lobbyMessage())
+  }
+
+  private lobbyMessage(): ServerMessage {
+    return {
       t: 'lobby',
       code: this.lobby.code,
       status: this.lobby.status,
@@ -330,7 +337,7 @@ export class Room extends DurableObject<Env> {
       maxPlayers: MAX_PLAYERS,
       settings: this.lobby.settings,
       players: this.lobby.players.map((player) => ({ id: player.id, name: player.name, ready: player.ready, connected: player.connected })),
-    })
+    }
   }
 
   private async persist(): Promise<void> {

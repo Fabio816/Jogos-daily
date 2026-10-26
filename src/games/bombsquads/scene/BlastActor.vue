@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, shallowRef } from 'vue'
 import { useLoop } from '@tresjs/core'
 import * as THREE from 'three'
 import { PALETTE, cellToWorld } from '../visual'
@@ -17,7 +17,7 @@ function makeMaterial(color: string, additive: boolean): THREE.MeshBasicMaterial
   })
 }
 
-const blastGroup = ref<THREE.Group | null>(null)
+const blastGroup = shallowRef<THREE.Group | null>(null)
 const allMaterials: THREE.MeshBasicMaterial[] = []
 const shared = {
   outer: makeMaterial('#ff6b1a', false),
@@ -96,5 +96,5 @@ build()
 </script>
 
 <template>
-  <TresPrimitive v-if="blastGroup" :object="blastGroup" />
+  <primitive v-if="blastGroup" :object="blastGroup" />
 </template>

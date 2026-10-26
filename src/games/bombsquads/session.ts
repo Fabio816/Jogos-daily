@@ -1,9 +1,14 @@
 /**
  * Sessão guardada no navegador: sem ela, uma queda de conexão vira "saiu da
  * partida". O token é o segredo que o servidor pede para reconectar.
+ *
+ * Fica em sessionStorage (por aba): duas janelas do mesmo navegador entram como
+ * dois jogadores diferentes, e a primeira não perde o lugar para a segunda.
  */
 const KEY = 'bombsquads:session'
 const NAME_KEY = 'bombsquads:name'
+
+const SESSION_STORE: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = typeof sessionStorage === 'undefined' ? ({} as Storage) : sessionStorage
 
 export type Session = {
   code: string
@@ -14,7 +19,7 @@ export type Session = {
 
 export function loadSession(): Session | null {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = SESSION_STORE.getItem(KEY)
     if (!raw) return null
     const data = JSON.parse(raw) as Partial<Session>
     if (typeof data.code === 'string' && typeof data.playerId === 'string' && typeof data.token === 'string') {
@@ -28,7 +33,7 @@ export function loadSession(): Session | null {
 
 export function saveSession(session: Session): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(session))
+    SESSION_STORE.setItem(KEY, JSON.stringify(session))
   } catch {
     // modo privado: a reconexão só funciona enquanto a página estiver aberta
   }
@@ -36,7 +41,7 @@ export function saveSession(session: Session): void {
 
 export function clearSession(): void {
   try {
-    localStorage.removeItem(KEY)
+    SESSION_STORE.removeItem(KEY)
   } catch {
     // nada a limpar
   }

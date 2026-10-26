@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { shallowRef } from 'vue'
 import * as THREE from 'three'
 import { useLoop } from '@tresjs/core'
 import { PALETTE, toonGradient } from '../visual'
@@ -7,9 +7,9 @@ import { PALETTE, toonGradient } from '../visual'
 /** Bomba: esfera escura com faixa metálica, pavio e faísca pulsando. */
 const props = defineProps<{ x: number; z: number }>()
 
-const inner = ref<THREE.Group>()
-const spark = ref<THREE.Mesh>()
-const glow = ref<THREE.PointLight>()
+const inner = shallowRef<THREE.Group>()
+const spark = shallowRef<THREE.Mesh>()
+const glow = shallowRef<THREE.PointLight>()
 
 const { onBeforeRender } = useLoop()
 onBeforeRender(() => {
