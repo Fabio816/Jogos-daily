@@ -49,6 +49,14 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        title: 'Bombsquads (prévia)',
+        items: [
+          'Novo jogo: arena 3D de bombas para até 10 jogadores, com servidor dedicado (Cloudflare). Sala por código, configurações do anfitrião e fechamento da arena no fim de cada rodada.',
+          'A rota é /bombsquads; o ícone aparece no hub.',
+          'No lobby, quem cai continua no lugar por um minuto (aparece como desconectado) e volta recarregando a página.',
+        ],
+      },
+      {
         title: 'Onde Estou?',
         items: [
           'Mapa com nomes em inglês (MapTiler), em vez do nome local (ex.: japonês).',

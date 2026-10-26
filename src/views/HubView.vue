@@ -77,6 +77,13 @@ const GAMES: GameCard[] = [
     color: 'rose',
   },
   {
+    to: '/bombsquads',
+    title: 'Bombsquads',
+    desc: 'Arena 3D de bombas que fecha de fora pra dentro. Até 10 jogadores.',
+    icon: 'BS',
+    color: 'lilac',
+  },
+  {
     href: 'https://play.bomberman.fans/hub.html',
     title: 'Bomberman',
     desc: 'Arena online de Bomberman com salas e partidas.',

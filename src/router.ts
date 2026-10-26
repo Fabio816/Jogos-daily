@@ -8,6 +8,10 @@ import LoginView from './views/LoginView.vue';
 import ChangelogView from './views/ChangelogView.vue';
 import { isUnlocked } from './lib/gate';
 
+// A cena do Bombsquads carrega three.js: fica num chunk separado e só entra
+// quando a rota é aberta.
+const BombsquadsView = () => import('./games/bombsquads/BombsquadsView.vue');
+
 // Os links antigos com ?sala=CODIGO continuam funcionando na rota do quiz.
 export const router = createRouter({
   history: createWebHistory(),
@@ -18,6 +22,7 @@ export const router = createRouter({
     { path: '/termo', name: 'termo', component: TermoView },
     { path: '/bomb-party', name: 'bomb', component: BombView },
     { path: '/onde-estou', name: 'onde', component: OndeEstouView },
+    { path: '/bombsquads', name: 'bombsquads', component: BombsquadsView },
     { path: '/novidades', name: 'changelog', component: ChangelogView },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],

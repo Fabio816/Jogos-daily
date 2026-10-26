@@ -37,6 +37,15 @@ Não use `pkill -f "port 5199"` (mata o próprio shell). Use `setsid` com `< /de
 - `src/data/`: perguntas e capas. Os JSON são gerados pelos scripts em `scripts/` (ver o `package.json`).
 - `src/data/changelog.ts`: novidades mostradas em `/novidades`.
 - `database.rules.json`: regras do Realtime Database. Versione qualquer mudança aqui.
+- `server/bombsquads/`: servidor do Bombsquads em Cloudflare Workers + Durable Objects (uma sala por Durable Object). Lobby salvo em storage; partida em memória com tick de 30 Hz e snapshots a 15 Hz. Presença no lobby: quem cai fica marcado como desconectado por até 60 s (alarme da DO) e pode reconectar com playerId+token; na partida cai como espectador conectável. Dev: `npm run dev:bombsquads-server` (porta 8787). Testes: `npm test` (inclui `server/bombsquads/test`). Carga: `node server/bombsquads/scripts/load-test.mjs http://127.0.0.1:8787 10 40`. E2E do cliente: `BS_E2E=1 npm test -- --run` com o servidor local no ar. Deploy só quando o dono pedir: `npm --prefix server/bombsquads run deploy`. URL pública: `wss://bombsquads-server.bombsquads.workers.dev`. Sem controle de acesso além do gate do app (decisão do dono).
+- `src/games/bombsquads/sim/`: simulação compartilhada (fonte única), usada pelo servidor e pelo cliente. Não importa Vue, three nem APIs de browser/Node.
+- `src/games/bombsquads/` (cliente, rota `/bombsquads`):
+  - `messages.ts` é o contrato cliente/servidor (tipos só); `server/bombsquads` importa daqui, então mudar aqui mexe nos dois lados.
+  - `config.ts` (URL de WS, `VITE_BOMBSQUADS_WS_URL`; `.env.local` local usa `ws://127.0.0.1:8787`), `session.ts` (sessão no localStorage: playerId+token para reconexão), `connection.ts` (WebSocket com reconexão; close 4001 é fatal).
+  - `match-client.ts`/`interp.ts`/`predict.ts`: interpola os remotos 100 ms atrás, prediz o local a cada tick com `movePlayer` da sim, e envia input só quando muda.
+  - `input.ts`: WASD/setas + espaço/F. `visual.ts`/`arena.ts`: paleta toon e arena instanciada; `scene/`: componentes TresJS (MatchScene, PlayerActor, BombActor, BlastActor, ItemActor, FallingBlock, LobbyView, HudView, SceneLights, CameraRig).
+  - Testes: `client.test.ts` (predição, interpolação, teclado) e `e2e.test.ts` (integração contra o servidor local; roda só com `BS_E2E=1 npm test -- --run` e `npm run dev:bombsquads-server` no ar; senão pula). Cena 3D precisa de olho humano (headless WebGL aqui não é confiável).
+  - TresJS: use `templateCompilerOptions` do `@tresjs/core/template-compiler-options` no plugin do Vue (`vite.config.ts`); loops usam `useLoop().onBeforeRender(({ delta }) => …)`; refs de componentes Tres entregam o objeto three direto.
 
 ## Padrões que já existem (reuse, não reinvente)
 
