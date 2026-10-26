@@ -2,8 +2,8 @@ export { Room } from './room'
 
 /** Sem I, O, 0 e 1: o código pode ser ditado sem confusão. */
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-const CODE_LENGTH = 5
-const ROOM_PATH = /^\/room\/([A-HJ-NP-Z2-9]{5})$/
+const CODE_LENGTH = 4
+const ROOM_PATH = /^\/room\/([A-HJ-NP-Z2-9]{4})$/
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
