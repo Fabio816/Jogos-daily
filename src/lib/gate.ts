@@ -20,3 +20,10 @@ export function unlock(password: string): boolean {
   }
   return true;
 }
+
+/** Atalho de dev: ?devgate=1 libera o navegador de teste. Em produção não faz nada. */
+export function unlockFromQuery(): boolean {
+  if (!import.meta.env.DEV) return false;
+  if (!new URLSearchParams(location.search).has('devgate')) return false;
+  return unlock(PASSWORD);
+}

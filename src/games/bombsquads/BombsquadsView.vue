@@ -86,8 +86,12 @@ function onMessage(raw: ServerMessage): void {
 
 function join(code: string): void {
   const clean = code.trim().toUpperCase()
-  if (busy.value || clean.length !== 4) return
-  busy.value = true
+  debugMessage('join', clean)
+  if (clean.length !== 4) return
+  openRoom(clean)
+}
+
+function openRoom(clean: string): void {
   connection.value?.stop()
   resetLocalState()
   codeInput.value = clean
@@ -96,7 +100,10 @@ function join(code: string): void {
     url: roomUrl(clean),
     hello: helloMessage,
     onMessage,
-    onStatus: (next) => (status.value = next),
+    onStatus: (next) => {
+      status.value = next
+      debugMessage('status', next)
+    },
     onFatal: () => (errorMessage.value = 'Conexão encerrada pelo servidor.'),
   })
   connection.value.start()
@@ -107,9 +114,11 @@ async function createRoom(): Promise<void> {
   busy.value = true
   try {
     const code = await createRoomCode()
-    join(code)
+    debugMessage('sala', code)
+    openRoom(code)
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Falha ao criar sala.'
+    debugMessage('erro', errorMessage.value)
   } finally {
     busy.value = false
   }
@@ -208,6 +217,11 @@ onMounted(() => {
     const trying = status.value === 'connecting' || status.value === 'reconnecting'
     waiting.value = trying && lobby.value === null && Date.now() - startedAt.value > ELAPSED
   }, 1000)
+  // Ajuda de dev: ?auto=1 cria a sala sozinho (usado pelo navegador de teste headless).
+  if (import.meta.env.DEV && route.query.auto === '1') {
+    debugMessage('montou', 'auto=1')
+    setTimeout(() => { if (lobby.value === null && !busy.value) void createRoom() }, 400)
+  }
 })
 onBeforeUnmount(() => {
   if (waitingTimer) clearInterval(waitingTimer)
@@ -215,9 +229,17 @@ onBeforeUnmount(() => {
 
 const serverLabel = computed(() => new URL(WS_BASE.replace(/^ws/, 'http')).host)
 
-/** Diagnóstico no console durante o dev. */
+/** Diagnóstico no console durante o dev (e um rastro pequeno na tela). */
+const trace = ref<string[]>([])
+const isDevTrace = import.meta.env.DEV
 function debugMessage(label: string, payload: unknown): void {
-  if (import.meta.env.DEV) console.debug('[bombsquads]', label, payload)
+  if (!import.meta.env.DEV) return
+  const now = new Date()
+  const stamp = `${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
+  const kind = typeof payload === 'string' ? payload : (payload as { t?: string } | null)?.t ?? ''
+  trace.value.push(`${stamp} ${label} ${kind}`)
+  if (trace.value.length > 12) trace.value.splice(0, trace.value.length - 12)
+  console.debug('[bombsquads]', label, payload)
 }
 </script>
 
@@ -244,6 +266,7 @@ function debugMessage(label: string, payload: unknown): void {
           Sem resposta do servidor de partidas ({{ serverLabel }}). Ele está no ar?
           Local: <code>npm run dev:bombsquads-server</code>
         </p>
+        <p v-if="isDevTrace" class="bs-trace">{{ trace.join(' | ') }}</p>
       </div>
     </section>
 
@@ -308,4 +331,5 @@ function debugMessage(label: string, payload: unknown): void {
 .bs-hint { font-size: 12px; opacity: 0.75; margin-top: 10px; }
 .bs-error { color: #ff9d9d; margin-top: 8px; font-size: 13px; }
 .bs-warn { color: #ffd166; margin-top: 8px; font-size: 13px; }
+.bs-trace { margin-top: 6px; font-size: 11px; opacity: 0.65; word-break: break-all; }
 </style>
